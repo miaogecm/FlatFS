@@ -6,7 +6,7 @@ FlatFS is a metadata-optimized file system built for fast non-volatile memory (N
 
 ## Building FlatFS
 
-FlatFS is implemented based on Linux kernel 4.15.0 and requires Intel Optane DC persistent memory hardware. Following is the instructions of building FlatFS.
+FlatFS is implemented based on Linux kernel 4.15.0 and requires Intel Optane DC persistent memory hardware. Following are the instructions of building FlatFS.
 
 **Hardware requirements:** Intel Optane DC persistent memory
 
@@ -54,17 +54,13 @@ Create a mount directory: `mkdir /mnt/flatfs`
 
 Mount on `/dev/pmem0`: `mount -t flatfs -o init /dev/pmem0 /mnt/flatfs`
 
-#### 4. Run FlatFS
+#### 4. Umount FlatFS
 
-The `evaluation/examples` directory contains several examples to run FlatFS. 
-
-#### 5. Umount FlatFS
-
-please run `umount /mnt/flatfs`.
+Please run `umount /mnt/flatfs`.
 
 ## Publication
 
-Miao Cai, Junru Shen, Bin Tang, Hao Huang, Baoliu Ye. FlatFS: Flatten Hierarchical File System Namespace for Non-volatile Memories, *USENIX Annual Technical Conference* (USENIX ATC), CARLSBAD, CA, USA. July 11-13, 2022.
+Miao Cai, Junru Shen, Bin Tang, Hao Huang, Baoliu Ye. FlatFS: Flatten Hierarchical File System Namespace for Non-volatile Memories, *USENIX Annual Technical Conference (USENIX ATC)*, CARLSBAD, CA, USA. July 11-13, 2022.
 
 ## Authors
 
