@@ -1,0 +1,1579 @@
+./pmfs_test.c: * Copyright 2012-2013 Intel Corporation
+./pmfs_test.c: * Copyright 2009-2011 Marco Stornelli <marco.stornelli@gmail.com>
+./pmfs_test.c: * 2003-2004 (c) MontaVista Software, Inc. , Steve Longerbeam
+./pmfs_test.c:	psb->s_sum = 0;
+./pmfs_def.h: * Copyright 2012-2013 Intel Corporation
+./pmfs_def.h: * Copyright 2009-2011 Marco Stornelli <marco.stornelli@gmail.com>
+./pmfs_def.h: * 2003-2004 (c) MontaVista Software, Inc. , Steve Longerbeam
+./pmfs_def.h:#define PMFS_DIR_ROUND          (PMFS_DIR_PAD - 1)
+./pmfs_def.h: *    a 64 byte log-entry can store 48 bytes of data and we would like
+./pmfs_def.h: *    to log an inode using only 2 log-entries
+./pmfs_def.h:	u8	    height;         /* height of data b-tree; max 3 for now */
+./pmfs_def.h:	__le32	i_mtime;            /* Inode b-tree Modification time */
+./pmfs_def.h:	__le32 padding;     /* pad to ensure truncate_item starts 8-byte aligned */
+./pmfs_def.h:/* This is a per-inode structure and follows immediately after the 
+./pmfs_def.h: * #define PMFS_NAME_LEN (PMFS_INODE_SIZE - offsetof(struct pmfs_inode,
+./pmfs_def.h: *         i_d.d_name) - 1)
+./pmfs_def.h:	 * tail and gen_id must fall in the same 8-byte quadword */
+./pmfs_def.h:#define PMFS_SB_STATIC_SIZE(ps) ((u64)&ps->s_start_dynamic - (u64)ps)
+./pmfs_def.h:#define CACHELINE_MASK  (~(CACHELINE_SIZE - 1))
+./pmfs_def.h:#define CACHELINE_ALIGN(addr) (((addr)+CACHELINE_SIZE-1) & CACHELINE_MASK)
+./pmfs_def.h:	len = len + ((unsigned long)(buf) & (CACHELINE_SIZE - 1));
+./ioctl.c: * Copyright 2012-2013 Intel Corporation
+./ioctl.c: * Copyright 2010-2011 Marco Stornelli <marco.stornelli@gmail.com>
+./ioctl.c:	struct address_space *mapping = filp->f_mapping;
+./ioctl.c:	struct inode    *inode = mapping->host;
+./ioctl.c:	struct super_block *sb = inode->i_sb;
+./ioctl.c:	pi = pmfs_get_inode(sb, inode->i_ino);
+./ioctl.c:		return -EACCES;
+./ioctl.c:		flags = le32_to_cpu(pi->i_flags) & PMFS_FL_USER_VISIBLE;
+./ioctl.c:			ret = -EPERM;
+./ioctl.c:			ret = -EFAULT;
+./ioctl.c:		oldflags = le32_to_cpu(pi->i_flags);
+./ioctl.c:				ret = -EPERM;
+./ioctl.c:		if (!S_ISDIR(inode->i_mode))
+./ioctl.c:		inode->i_ctime = current_time(inode);
+./ioctl.c:		pi->i_flags = cpu_to_le32(flags);
+./ioctl.c:		pi->i_ctime = cpu_to_le32(inode->i_ctime.tv_sec);
+./ioctl.c:		return put_user(inode->i_generation, (int __user *)arg);
+./ioctl.c:			return -EPERM;
+./ioctl.c:			ret = -EFAULT;
+./ioctl.c:		inode->i_ctime = current_time(inode);
+./ioctl.c:		inode->i_generation = generation;
+./ioctl.c:		pi->i_ctime = cpu_to_le32(inode->i_ctime.tv_sec);
+./ioctl.c:		pi->i_generation = cpu_to_le32(inode->i_generation);
+./ioctl.c:		return -ENOTTY;
+./ioctl.c:		return -ENOIOCTLCMD;
+./super.c: * Copyright 2012-2013 Intel Corporation
+./super.c: * Copyright 2009-2011 Marco Stornelli <marco.stornelli@gmail.com>
+./super.c: * 2003-2004 (c) MontaVista Software, Inc. , Steve Longerbeam
+./super.c:#include <linux/backing-dev.h>
+./super.c:		printk(KERN_CRIT "pmfs err: remounting filesystem read-only");
+./super.c:		sb->s_flags |= MS_RDONLY;
+./super.c:	bits = fls(size) - 1;
+./super.c:	sb->s_blocksize_bits = bits;
+./super.c:	sb->s_blocksize = (1 << bits);
+./super.c:	struct pmfs_sb_info *sbi = (struct pmfs_sb_info *)sb->s_fs_info;
+./super.c:	return sbi->s_mount_opt & PMFS_MOUNT_HUGEIOREMAP;
+./super.c:		return -EINVAL;
+./super.c:	sbi->s_bdev = sb->s_bdev;
+./super.c:	dax_dev = fs_dax_get_by_host(sb->s_bdev->bd_disk->disk_name);
+./super.c:		return -EINVAL;
+./super.c:		return -EINVAL;
+./super.c:	sbi->virt_addr = virt_addr;
+./super.c:	sbi->phys_addr = pfn_t_to_pfn(__pfn_t) << PAGE_SHIFT;
+./super.c:	sbi->initsize = size;
+./super.c:	res = (1ULL << (3 * 9 + bits)) - 1;
+./super.c:	{ Opt_err_ro,	     "errors=remount-ro"  },
+./super.c:			sbi->bpi = option;
+./super.c:			sbi->uid = make_kuid(current_user_ns(), option);
+./super.c:			sbi->gid = make_kgid(current_user_ns(), option);
+./super.c:			sbi->mode = option & 01777U;
+./super.c:			set_opt(sbi->s_mount_opt, FORMAT);
+./super.c:			sbi->jsize = memparse(args[0].from, &rest);
+./super.c:			if (sbi->jsize & (sbi->jsize - 1) ||
+./super.c:				sbi->jsize < PMFS_MINIMUM_JOURNAL_SIZE) {
+./super.c:			sbi->num_inodes = option;
+./super.c:			clear_opt(sbi->s_mount_opt, ERRORS_CONT);
+./super.c:			clear_opt(sbi->s_mount_opt, ERRORS_RO);
+./super.c:			set_opt(sbi->s_mount_opt, ERRORS_PANIC);
+./super.c:			clear_opt(sbi->s_mount_opt, ERRORS_CONT);
+./super.c:			clear_opt(sbi->s_mount_opt, ERRORS_PANIC);
+./super.c:			set_opt(sbi->s_mount_opt, ERRORS_RO);
+./super.c:			clear_opt(sbi->s_mount_opt, ERRORS_RO);
+./super.c:			clear_opt(sbi->s_mount_opt, ERRORS_PANIC);
+./super.c:			set_opt(sbi->s_mount_opt, ERRORS_CONT);
+./super.c:			set_opt(sbi->s_mount_opt, PROTECT);
+./super.c:			set_opt(sbi->s_mount_opt, PROTECT_OLD);
+./super.c:			set_opt(sbi->s_mount_opt, HUGEMMAP);
+./super.c:			clear_opt(sbi->s_mount_opt, HUGEIOREMAP);
+./super.c:	return -EINVAL;
+./super.c:	return -EINVAL;
+./super.c:	minimum_size = 2 << sb->s_blocksize_bits;
+./super.c:	if (sbi->num_inodes > 0)
+./super.c:		num_blocks = (sbi->num_inodes >>
+./super.c:			(sb->s_blocksize_bits - PMFS_INODE_BITS)) + 1;
+./super.c:	minimum_size += (num_blocks << sb->s_blocksize_bits);
+./super.c:	minimum_size += sbi->jsize;
+./super.c:	sbi->block_start = (unsigned long)0;
+./super.c:	sbi->block_end = ((unsigned long)(size) >> PAGE_SHIFT);
+./super.c:	sbi->num_free_blocks = ((unsigned long)(size) >> PAGE_SHIFT);
+./super.c:	if (!sbi->virt_addr) {
+./super.c:		return ERR_PTR(-EINVAL);
+./super.c:		first_pmfs_super = sbi->virt_addr;
+./super.c:	blocksize = sbi->blocksize = PMFS_DEF_BLOCK_SIZE_4K;
+./super.c:	blocksize = sb->s_blocksize;
+./super.c:	if (sbi->blocksize && sbi->blocksize != blocksize)
+./super.c:		sbi->blocksize = blocksize;
+./super.c:		return ERR_PTR(-EINVAL);
+./super.c:	journal_meta_start = (journal_meta_start + CACHELINE_SIZE - 1) &
+./super.c:		~(CACHELINE_SIZE - 1);
+./super.c:	inode_table_start = (inode_table_start + CACHELINE_SIZE - 1) &
+./super.c:		~(CACHELINE_SIZE - 1);
+./super.c:		return ERR_PTR(-EINVAL);
+./super.c:	journal_data_start = (journal_data_start + blocksize - 1) &
+./super.c:		~(blocksize - 1);
+./super.c:		journal_data_start, sbi->jsize, inode_table_start);
+./super.c:	/* clear out super-block and inode table */
+./super.c:	super->s_size = cpu_to_le64(size);
+./super.c:	super->s_blocksize = cpu_to_le32(blocksize);
+./super.c:	super->s_magic = cpu_to_le16(PMFS_SUPER_MAGIC);
+./super.c:	super->s_journal_offset = cpu_to_le64(journal_meta_start);
+./super.c:	super->s_inode_table_offset = cpu_to_le64(inode_table_start);
+./super.c:	pmfs_init_blockmap(sb, journal_data_start + sbi->jsize);
+./super.c:	if (pmfs_journal_hard_init(sb, journal_data_start, sbi->jsize) < 0) {
+./super.c:		return ERR_PTR(-EINVAL);
+./super.c:		return ERR_PTR(-EINVAL);
+./super.c:	root_i->i_mode = cpu_to_le16(sbi->mode | S_IFDIR);
+./super.c:	root_i->i_uid = cpu_to_le32(from_kuid(&init_user_ns, sbi->uid));
+./super.c:	root_i->i_gid = cpu_to_le32(from_kgid(&init_user_ns, sbi->gid));
+./super.c:	root_i->i_links_count = cpu_to_le16(2);
+./super.c:	root_i->i_blk_type = PMFS_BLOCK_TYPE_4K;
+./super.c:	root_i->i_flags = 0;
+./super.c:	root_i->i_blocks = cpu_to_le64(1);
+./super.c:	root_i->i_size = cpu_to_le64(sb->s_blocksize);
+./super.c:	root_i->i_atime = root_i->i_mtime = root_i->i_ctime =
+./super.c:	root_i->root = cpu_to_le64(pmfs_get_block_off(sb, blocknr,
+./super.c:	root_i->height = 0;
+./super.c:	pmfs_memunlock_range(sb, de, sb->s_blocksize);
+./super.c:	de->ino = cpu_to_le64(PMFS_ROOT_INO);
+./super.c:	de->name_len = 1;
+./super.c:	de->de_len = cpu_to_le16(PMFS_DIR_REC_LEN(de->name_len));
+./super.c:	strcpy(de->name, ".");
+./super.c:	de = (struct pmfs_direntry *)((char *)de + le16_to_cpu(de->de_len));
+./super.c:	de->ino = cpu_to_le64(PMFS_ROOT_INO);
+./super.c:	de->de_len = cpu_to_le16(sb->s_blocksize - PMFS_DIR_REC_LEN(1));
+./super.c:	de->name_len = 2;
+./super.c:	strcpy(de->name, "..");
+./super.c:	pmfs_memlock_range(sb, de, sb->s_blocksize);
+./super.c:	/* set_opt(sbi->s_mount_opt, PROTECT); */
+./super.c:	set_opt(sbi->s_mount_opt, HUGEIOREMAP);
+./super.c:	set_opt(sbi->s_mount_opt, ERRORS_CONT);
+./super.c:	sbi->jsize = PMFS_DEFAULT_JOURNAL_SIZE;
+./super.c: *      if (root_pi->i_d.d_next) {
+./super.c: *              pmfs_warn("root->next not NULL, trying to fix\n");
+./super.c:	if (!S_ISDIR(le16_to_cpu(root_pi->i_mode)))
+./super.c:	if (le16_to_cpu(super->s_magic) != PMFS_SUPER_MAGIC) {
+./super.c:		if (le16_to_cpu(super_redund->s_magic) != PMFS_SUPER_MAGIC) {
+./super.c:			/* Try to auto-recover the super block */
+./super.c:			/* Try to auto-recover the super block */
+./super.c:	u64 ino_next = le64_to_cpu(head->i_next_truncate);
+./super.c:			inode->i_nlink, pi->i_size, li->i_truncatesize);
+./super.c:		if (inode->i_nlink) {
+./super.c:					le64_to_cpu(li->i_truncatesize));
+./super.c:			pmfs_setsize(inode, le64_to_cpu(li->i_truncatesize));
+./super.c:				inode->i_ino);
+./super.c:		ino_next = le64_to_cpu(li->i_next_truncate);
+./super.c:	head->i_next_truncate = 0;
+./super.c:	int retval = -EINVAL;
+./super.c:		return -ENOMEM;
+./super.c:	sb->s_fs_info = sbi;
+./super.c:	atomic_set(&sbi->next_generation, random);
+./super.c:	INIT_LIST_HEAD(&sbi->block_inuse_head);
+./super.c:	sbi->mode = (S_IRUGO | S_IXUGO | S_IWUSR);
+./super.c:	sbi->uid = current_fsuid();
+./super.c:	sbi->gid = current_fsgid();
+./super.c:	set_opt(sbi->s_mount_opt, XIP);
+./super.c:	clear_opt(sbi->s_mount_opt, PROTECT);
+./super.c:	set_opt(sbi->s_mount_opt, HUGEIOREMAP);
+./super.c:	INIT_LIST_HEAD(&sbi->s_truncate);
+./super.c:	mutex_init(&sbi->s_truncate_lock);
+./super.c:	mutex_init(&sbi->inode_table_mutex);
+./super.c:	mutex_init(&sbi->s_lock);
+./super.c:	set_opt(sbi->s_mount_opt, MOUNTING);
+./super.c:	if (sbi->s_mount_opt & PMFS_MOUNT_FORMAT) {
+./super.c:		root_pi = pmfs_init(sb, sbi->initsize);
+./super.c:		  (u64)sbi->phys_addr);
+./super.c:		retval = -EINVAL;
+./super.c:		retval = -EINVAL;
+./super.c:				le16_to_cpu(super->s_magic), PMFS_SUPER_MAGIC);
+./super.c:	blocksize = le32_to_cpu(super->s_blocksize);
+./super.c:		first_pmfs_super = sbi->virt_addr;
+./super.c:	sb->s_magic = le16_to_cpu(super->s_magic);
+./super.c:	sb->s_op = &pmfs_sops;
+./super.c:	sb->s_maxbytes = pmfs_max_size(sb->s_blocksize_bits);
+./super.c:	sb->s_time_gran = 1;
+./super.c:	sb->s_export_op = &pmfs_export_ops;
+./super.c:	sb->s_xattr = NULL;
+./super.c:	sb->s_flags |= MS_NOSEC;
+./super.c:	sb->s_root = d_make_root(root_i);
+./super.c:	if (!sb->s_root) {
+./super.c:		retval = -ENOMEM;
+./super.c:	/* If the FS was not formatted on this mount, scan the meta-data after
+./super.c:	if ((sbi->s_mount_opt & PMFS_MOUNT_FORMAT) == 0)
+./super.c:	if (!(sb->s_flags & MS_RDONLY)) {
+./super.c:		pmfs_memunlock_range(sb, &super->s_mtime, 8);
+./super.c:		pmfs_memcpy_atomic(&super->s_mtime, &mnt_write_time, 8);
+./super.c:		pmfs_memlock_range(sb, &super->s_mtime, 8);
+./super.c:		pmfs_flush_buffer(&super->s_mtime, 8, false);
+./super.c:	clear_opt(sbi->s_mount_opt, MOUNTING);
+./super.c:	struct super_block *sb = d->d_sb;
+./super.c:	struct pmfs_sb_info *sbi = (struct pmfs_sb_info *)sb->s_fs_info;
+./super.c:	buf->f_type = PMFS_SUPER_MAGIC;
+./super.c:	buf->f_bsize = sb->s_blocksize;
+./super.c:	count = sbi->block_end;
+./super.c:	buf->f_blocks = sbi->block_end;
+./super.c:	buf->f_bfree = buf->f_bavail = pmfs_count_free_blocks(sb);
+./super.c:	buf->f_files = (sbi->s_inodes_count);
+./super.c:	buf->f_ffree = (sbi->s_free_inodes_count);
+./super.c:	buf->f_namelen = PMFS_NAME_LEN;
+./super.c:		buf->f_bfree);
+./super.c:		"blocknodes 0x%lx\n", (sbi->s_inodes_count),
+./super.c:		(sbi->s_free_inodes_count), (sbi->num_blocknode_allocated));
+./super.c:	struct pmfs_sb_info *sbi = PMFS_SB(root->d_sb);
+./super.c:	seq_printf(seq, ",physaddr=0x%016llx", (u64)sbi->phys_addr);
+./super.c:	if (sbi->initsize)
+./super.c:		seq_printf(seq, ",init=%luk", sbi->initsize >> 10);
+./super.c:	if (sbi->blocksize)
+./super.c:		seq_printf(seq, ",bs=%lu", sbi->blocksize);
+./super.c:	if (sbi->bpi)
+./super.c:		seq_printf(seq, ",bpi=%lu", sbi->bpi);
+./super.c:	if (sbi->num_inodes)
+./super.c:		seq_printf(seq, ",N=%lu", sbi->num_inodes);
+./super.c:	if (sbi->mode != (S_IRWXUGO | S_ISVTX))
+./super.c:		seq_printf(seq, ",mode=%03o", sbi->mode);
+./super.c:	if (uid_valid(sbi->uid))
+./super.c:		seq_printf(seq, ",uid=%u", from_kuid(&init_user_ns, sbi->uid));
+./super.c:	if (gid_valid(sbi->gid))
+./super.c:		seq_printf(seq, ",gid=%u", from_kgid(&init_user_ns, sbi->gid));
+./super.c:	if (test_opt(root->d_sb, ERRORS_RO))
+./super.c:		seq_puts(seq, ",errors=remount-ro");
+./super.c:	if (test_opt(root->d_sb, ERRORS_PANIC))
+./super.c:	if (test_opt(root->d_sb, PROTECT))
+./super.c:	if (test_opt(root->d_sb, HUGEMMAP))
+./super.c:	if (test_opt(root->d_sb, HUGEIOREMAP))
+./super.c:	if (test_opt(root->d_sb, XIP))
+./super.c:	int ret = -EINVAL;
+./super.c:	mutex_lock(&sbi->s_lock);
+./super.c:	old_sb_flags = sb->s_flags;
+./super.c:	old_mount_opt = sbi->s_mount_opt;
+./super.c:	sb->s_flags = (sb->s_flags & ~MS_POSIXACL) |
+./super.c:		      ((sbi->s_mount_opt & PMFS_MOUNT_POSIX_ACL) ? MS_POSIXACL : 0);
+./super.c:	if ((*mntflags & MS_RDONLY) != (sb->s_flags & MS_RDONLY)) {
+./super.c:		pmfs_memunlock_range(sb, &ps->s_mtime, 8);
+./super.c:		pmfs_memcpy_atomic(&ps->s_mtime, &mnt_write_time, 8);
+./super.c:		pmfs_memlock_range(sb, &ps->s_mtime, 8);
+./super.c:		pmfs_flush_buffer(&ps->s_mtime, 8, false);
+./super.c:	mutex_unlock(&sbi->s_lock);
+./super.c:	sb->s_flags = old_sb_flags;
+./super.c:	sbi->s_mount_opt = old_mount_opt;
+./super.c:	mutex_unlock(&sbi->s_lock);
+./super.c:	struct list_head *head = &(sbi->block_inuse_head);
+./super.c:	if (first_pmfs_super == sbi->virt_addr)
+./super.c:	if (sbi->virt_addr) {
+./super.c:		sbi->virt_addr = NULL;
+./super.c:		list_del(&i->link);
+./super.c:	sb->s_fs_info = NULL;
+./super.c:	sbi->num_blocknode_allocated--;
+./super.c:		sbi->num_blocknode_allocated++;
+./super.c://	vi->vfs_inode.i_version = 1;
+./super.c:	return &vi->vfs_inode;
+./super.c:	call_rcu(&inode->i_rcu, pmfs_i_callback);
+./super.c:	vi->i_dir_start_lookup = 0;
+./super.c:	INIT_LIST_HEAD(&vi->i_truncated);
+./super.c:	inode_init_once(&vi->vfs_inode);
+./super.c:		return -ENOMEM;
+./super.c:		return -ENOMEM;
+./super.c:		return -ENOMEM;
+./super.c:		return ERR_PTR(-ESTALE);
+./super.c:	if ((ino >> PMFS_INODE_BITS) > (sbi->s_inodes_count))
+./super.c:		return ERR_PTR(-ESTALE);
+./super.c:	if (generation && inode->i_generation != generation) {
+./super.c:		return ERR_PTR(-ESTALE);
+./super.c:MODULE_AUTHOR("Intel Corporation <linux-pmfs@intel.com>");
+./README.md:https://github.com/linux-pmfs/pmfs
+./README.md:The master branch works on the 4.15 version of x86-64 Linux kernel.
+./README.md:#mount -t pmfs -o init /dev/pmem0 /mnt/ramdisk 
+./README.md:#mount -t pmfs /dev/pmem0 /mnt/ramdisk 
+./README.md:There are two scripts provided in the source code, `setup-pmfs.sh` and `remount-pmfs.sh` to help setup PMFS.
+./README.md:* PMFS only works on x86-64 kernels.
+./intel-remount-pmfs.sh:#mount -t pmfs -o physaddr=0x100000000 none /mnt/ramdisk
+./intel-remount-pmfs.sh:mount -t pmfs -o physaddr=0x10000000000 none /mnt/ramdisk
+./xip.h: * Copyright 2012-2013 Intel Corporation
+./xip.h: * Copyright 2009-2011 Marco Stornelli <marco.stornelli@gmail.com>
+./xip.h:	return sbi->s_mount_opt & PMFS_MOUNT_XIP;
+./xip.h:#define mapping_is_xip(map) (map->a_ops->get_xip_mem)
+./wprotect.c: * Copyright 2012-2013 Intel Corporation
+./wprotect.c: * Copyright 2009-2011 Marco Stornelli <marco.stornelli@gmail.com>
+./wprotect.c: * 2003-2004 (c) MontaVista Software, Inc. , Steve Longerbeam
+./intel-setup-pmfs.sh:mount -t pmfs -o physaddr=0x10000000000,init=64G none /mnt/ramdisk
+./setup-pmfs.sh:mount -t pmfs -o init /dev/pmem0 /mnt/ramdisk
+./setup-pmfs.sh:mount -t pmfs -o init /dev/pmem1 /mnt/scratch
+./wprotect.h: * Copyright 2012-2013 Intel Corporation
+./wprotect.h: * Copyright 2010-2011 Marco Stornelli <marco.stornelli@gmail.com>
+./wprotect.h:	ps->s_wtime = cpu_to_le32(get_seconds());
+./wprotect.h:	ps->s_sum = 0;
+./wprotect.h:			PMFS_SB_STATIC_SIZE(ps) - sizeof(__le16));
+./wprotect.h:	ps->s_sum = cpu_to_le16(crc);
+./wprotect.h:	pi->i_sum = 0;
+./wprotect.h:	crc = crc16(~0, (__u8 *)pi + sizeof(__le16), PMFS_INODE_SIZE -
+./wprotect.h:	pi->i_sum = cpu_to_le16(crc);
+./wprotect.h:	struct pmfs_sb_info *sbi = (struct pmfs_sb_info *)sb->s_fs_info;
+./wprotect.h:	return sbi->s_mount_opt & PMFS_MOUNT_PROTECT;
+./wprotect.h:		__pmfs_memunlock_range(bp, sb->s_blocksize);
+./wprotect.h:		__pmfs_memlock_range(bp, sb->s_blocksize);
+./inode.c: * Copyright 2012-2013 Intel Corporation
+./inode.c: * Copyright 2009-2011 Marco Stornelli <marco.stornelli@gmail.com>
+./inode.c: * 2003-2004 (c) MontaVista Software, Inc. , Steve Longerbeam
+./inode.c:#include <linux/backing-dev.h>
+./inode.c: * Zeroes out the block if zero set. Increments inode->i_blocks.
+./inode.c:	unsigned int data_bits = blk_type_to_shift[pi->i_blk_type];
+./inode.c:	int errval = pmfs_new_block(sb, blocknr, pi->i_blk_type, zero);
+./inode.c:		le64_add_cpu(&pi->i_blocks,
+./inode.c:			(1 << (data_bits - sb->s_blocksize_bits)));
+./inode.c:	struct super_block *sb = inode->i_sb;
+./inode.c:	struct pmfs_inode *pi = pmfs_get_inode(sb, inode->i_ino);
+./inode.c:	unsigned int data_bits = blk_type_to_shift[pi->i_blk_type];
+./inode.c:	blk_shift = data_bits - sb->s_blocksize_bits;
+./inode.c:	blk_offset = file_blocknr & ((1 << blk_shift) - 1);
+./inode.c:	if (blocknr >= (1UL << (pi->height * meta_bits)))
+./inode.c:		" blk_offset %lx\n", file_blocknr, pi->height, bp,
+./inode.c:	return bp + (blk_offset << sb->s_blocksize_bits);
+./inode.c: * block: points to the root of the b-tree
+./inode.c:	node_bits = (height - 1) * meta_bits;
+./inode.c:				((1 << node_bits) - 1)) : 0;
+./inode.c:				((1 << node_bits) - 1)) : (1 << node_bits) - 1;
+./inode.c:			blocks += recursive_find_region(sb, node[i], height - 1,
+./inode.c:	struct super_block *sb = inode->i_sb;
+./inode.c:	struct pmfs_inode *pi = pmfs_get_inode(sb, inode->i_ino);
+./inode.c:	unsigned int data_bits = blk_type_to_shift[pi->i_blk_type];
+./inode.c:	if (*offset >= inode->i_size)
+./inode.c:		return -ENXIO;
+./inode.c:	if (!inode->i_blocks || !pi->root) {
+./inode.c:			return inode->i_size;
+./inode.c:			return -ENXIO;
+./inode.c:	offset_in_block = *offset & ((1UL << data_bits) - 1);
+./inode.c:	if (pi->height == 0) {
+./inode.c:	last_blocknr = inode->i_size >> data_bits;
+./inode.c:	blocks = recursive_find_region(inode->i_sb, pi->root, pi->height,
+./inode.c:		return -ENXIO;
+./inode.c:			*offset = inode->i_size;
+./inode.c:			*offset = inode->i_size;
+./inode.c:		blocks--;
+./inode.c:			   ((1 << data_bits) - offset_in_block);
+./inode.c:/* examine the meta-data block node up to the end_idx for any non-null
+./inode.c: * required to determine if a meta-data block contains no pointers and hence
+./inode.c:	int i, last_idx = (1 << META_BLK_SHIFT) - 1;
+./inode.c: * block: points to the root of the b-tree where the blocks need to be allocated
+./inode.c:	node_bits = (height - 1) * META_BLK_SHIFT;
+./inode.c:		mutex_lock(&sbi->s_lock);
+./inode.c:		mutex_unlock(&sbi->s_lock);
+./inode.c:				((1 << node_bits) - 1)) : 0;
+./inode.c:				((1 << node_bits) - 1)) : (1 << node_bits) - 1;
+./inode.c:				height - 1, btype, first_blk, last_blk, &mpty);
+./inode.c:				/* Freeing the meta-data block */
+./inode.c:				    end--;
+./inode.c:		/* Zero-out the freed range if the meta-block in not empty */
+./inode.c:			bzero = (end - start + 1) * sizeof(u64);
+./inode.c:	unsigned int height = pi->height, new_height = 0;
+./inode.c:	if (pi->i_blocks == 0 || newsize == 0) {
+./inode.c:	last_blocknr = ((newsize + pmfs_inode_blk_size(pi) - 1) >>
+./inode.c:		pmfs_inode_blk_shift(pi)) - 1;
+./inode.c:	pmfs_dbg_verbose("reducing tree height %x->%x\n", height, new_height);
+./inode.c:		height--;
+./inode.c:	/* pi->height and pi->root need to be atomically updated. use
+./inode.c:	/* pi->height is at offset 2 from pi */
+./inode.c:	cmpxchg_double_local((u64 *)pi, &pi->root, *(u64 *)pi, pi->root,
+./inode.c:								height - 1);
+./inode.c:	iblocks = pmfs_inode_count_iblocks_recursive(sb, root, pi->height);
+./inode.c:	return (iblocks << (pmfs_inode_blk_shift(pi) - sb->s_blocksize_bits));
+./inode.c:/* Support for sparse files: even though pi->i_size may indicate a certain
+./inode.c:		last_blocknr = (1UL << (height * META_BLK_SHIFT)) - 1;
+./inode.c:	struct super_block *sb = inode->i_sb;
+./inode.c:	struct pmfs_inode *pi = pmfs_get_inode(sb, inode->i_ino);
+./inode.c:	unsigned int data_bits = blk_type_to_shift[pi->i_blk_type];
+./inode.c:	inode->i_mtime = inode->i_ctime = current_time(inode);
+./inode.c:	if (!pi->root)
+./inode.c:			 pi->i_blocks, start, end, pi->height, pi->i_size);
+./inode.c:	first_blocknr = (start + (1UL << data_bits) - 1) >> data_bits;
+./inode.c:	if (pi->i_flags & cpu_to_le32(PMFS_EOFBLOCKS_FL)) {
+./inode.c:		last_blocknr = (1UL << (pi->height * meta_bits)) - 1;
+./inode.c:		last_blocknr = (end - 1) >> data_bits;
+./inode.c:		last_blocknr = pmfs_sparse_last_blocknr(pi->height,
+./inode.c:	root = pi->root;
+./inode.c:	if (pi->height == 0) {
+./inode.c:			pi->i_blk_type);
+./inode.c:		pmfs_free_block(sb, first_blocknr, pi->i_blk_type);
+./inode.c:		freed = recursive_truncate_blocks(sb, root, pi->height,
+./inode.c:			pi->i_blk_type, first_blocknr, last_blocknr, &mpty);
+./inode.c:	 * Don't trust inode->i_blocks; recalculate it by rescanning the inode
+./inode.c:		inode->i_blocks = pmfs_inode_count_iblocks(sb, pi, root);
+./inode.c:		inode->i_blocks -= (freed * (1 << (data_bits -
+./inode.c:				sb->s_blocksize_bits)));
+./inode.c:	pi->i_blocks = cpu_to_le64(inode->i_blocks);
+./inode.c:	pi->i_mtime = cpu_to_le32(inode->i_mtime.tv_sec);
+./inode.c:	pi->i_ctime = cpu_to_le32(inode->i_ctime.tv_sec);
+./inode.c:	check_eof_blocks(sb, pi, inode->i_size);
+./inode.c:	pi->i_mtime = cpu_to_le32(inode->i_mtime.tv_sec);
+./inode.c:	pi->i_ctime = cpu_to_le32(inode->i_ctime.tv_sec);
+./inode.c:	u32 height = pi->height;
+./inode.c:	__le64 *root, prev_root = pi->root;
+./inode.c:	pi->root = prev_root;
+./inode.c:	pi->height = height;
+./inode.c: * block: points to the root of the b-tree where the blocks need to be allocated
+./inode.c: * zero: whether to zero-out the allocated block(s)
+./inode.c:	node_bits = (height - 1) * meta_bits;
+./inode.c:					pi->i_flags |= cpu_to_le32(
+./inode.c:				/* save the meta-data into the journal before
+./inode.c:					int le_size = (last_index - i + 1) << 3;
+./inode.c:						blocknr, pi->i_blk_type));
+./inode.c:				/* save the meta-data into the journal before
+./inode.c:					int le_size = (last_index - i + 1) << 3;
+./inode.c:				((1 << node_bits) - 1)) : 0;
+./inode.c:				((1 << node_bits) - 1)) : (1 << node_bits) - 1;
+./inode.c:			height - 1, first_blk, last_blk, new_node, zero);
+./inode.c:		flush_bytes = (last_index - first_index + 1) * sizeof(node[0]);
+./inode.c:	unsigned int data_bits = blk_type_to_shift[pi->i_blk_type];
+./inode.c:	blk_shift = data_bits - sb->s_blocksize_bits;
+./inode.c:	last_blocknr = (file_blocknr + num - 1) >> blk_shift;
+./inode.c:		   pi->height, file_blocknr, num, first_blocknr, last_blocknr);
+./inode.c:	height = pi->height;
+./inode.c:	if (last_blocknr > max_blocks - 1) {
+./inode.c:		/* B-tree height increases as a result of this allocation */
+./inode.c:			errval = -ENOSPC;
+./inode.c:	if (!pi->root) {
+./inode.c:					   pi->i_blk_type));
+./inode.c:			pi->root = root;
+./inode.c:			pi->height = height;
+./inode.c:			errval = recursive_alloc_blocks(trans, sb, pi, pi->root,
+./inode.c:			pi->height, first_blocknr, last_blocknr, 1, zero);
+./inode.c:		/* Go forward only if the height of the tree is non-zero. */
+./inode.c:		if (height > pi->height) {
+./inode.c:					"\n", pi->height, height, total_blocks);
+./inode.c:		errval = recursive_alloc_blocks(trans, sb, pi, pi->root, height,
+./inode.c: * Allocate num data blocks for inode, starting at given file-relative
+./inode.c:	struct super_block *sb = inode->i_sb;
+./inode.c:	struct pmfs_inode *pi = pmfs_get_inode(sb, inode->i_ino);
+./inode.c:	inode->i_blocks = le64_to_cpu(pi->i_blocks);
+./inode.c:	if (sbi->num_inodes == 0) {
+./inode.c:		if (sbi->initsize >= PMFS_LARGE_INODE_TABLE_THREASHOLD)
+./inode.c:		init_inode_table_size = sbi->num_inodes << PMFS_INODE_BITS;
+./inode.c:	pi->i_mode = 0;
+./inode.c:	pi->i_uid = 0;
+./inode.c:	pi->i_gid = 0;
+./inode.c:	pi->i_links_count = cpu_to_le16(1);
+./inode.c:	pi->i_flags = 0;
+./inode.c:	pi->height = 0;
+./inode.c:	pi->i_dtime = 0;
+./inode.c:		pi->i_blk_type = PMFS_BLOCK_TYPE_2M;
+./inode.c:		pi->i_blk_type = PMFS_BLOCK_TYPE_4K;
+./inode.c:	num_blocks = (init_inode_table_size + pmfs_inode_blk_size(pi) - 1) >>
+./inode.c:	pi->i_size = cpu_to_le64(num_blocks << pmfs_inode_blk_shift(pi));
+./inode.c:	sbi->s_inodes_count = num_blocks <<
+./inode.c:			(pmfs_inode_blk_shift(pi) - PMFS_INODE_BITS);
+./inode.c:	num_blocks = num_blocks << (pmfs_inode_blk_shift(pi) -
+./inode.c:					sb->s_blocksize_bits);
+./inode.c:	sbi->s_free_inodes_count =
+./inode.c:		(sbi->s_inodes_count - PMFS_FREE_INODE_HINT_START);
+./inode.c:	sbi->s_free_inode_hint = (PMFS_FREE_INODE_HINT_START);
+./inode.c:	int ret = -EIO;
+./inode.c:		pmfs_err(inode->i_sb, "checksum error in inode %lx\n",
+./inode.c:			  (u64)inode->i_ino);
+./inode.c:	inode->i_mode = le16_to_cpu(pi->i_mode);
+./inode.c:	i_uid_write(inode, le32_to_cpu(pi->i_uid));
+./inode.c:	i_gid_write(inode, le32_to_cpu(pi->i_gid));
+./inode.c:	set_nlink(inode, le16_to_cpu(pi->i_links_count));
+./inode.c:	inode->i_size = le64_to_cpu(pi->i_size);
+./inode.c:	inode->i_atime.tv_sec = le32_to_cpu(pi->i_atime);
+./inode.c:	inode->i_ctime.tv_sec = le32_to_cpu(pi->i_ctime);
+./inode.c:	inode->i_mtime.tv_sec = le32_to_cpu(pi->i_mtime);
+./inode.c:	inode->i_atime.tv_nsec = inode->i_mtime.tv_nsec =
+./inode.c:					 inode->i_ctime.tv_nsec = 0;
+./inode.c:	inode->i_generation = le32_to_cpu(pi->i_generation);
+./inode.c:	if (inode->i_nlink == 0 &&
+./inode.c:	   (inode->i_mode == 0 || le32_to_cpu(pi->i_dtime))) {
+./inode.c:		ret = -ESTALE;
+./inode.c:	inode->i_blocks = le64_to_cpu(pi->i_blocks);
+./inode.c:	inode->i_mapping->a_ops = &pmfs_aops_xip;
+./inode.c:	switch (inode->i_mode & S_IFMT) {
+./inode.c:		inode->i_op = &pmfs_file_inode_operations;
+./inode.c:		inode->i_fop = &pmfs_xip_file_operations;
+./inode.c:		inode->i_op = &pmfs_dir_inode_operations;
+./inode.c:		inode->i_fop = &pmfs_dir_operations;
+./inode.c:		inode->i_op = &pmfs_symlink_inode_operations;
+./inode.c:		inode->i_size = 0;
+./inode.c:		inode->i_op = &pmfs_special_inode_operations;
+./inode.c:		init_special_inode(inode, inode->i_mode,
+./inode.c:				   le32_to_cpu(pi->dev.rdev));
+./inode.c:	pmfs_memunlock_inode(inode->i_sb, pi);
+./inode.c:	pi->i_mode = cpu_to_le16(inode->i_mode);
+./inode.c:	pi->i_uid = cpu_to_le32(i_uid_read(inode));
+./inode.c:	pi->i_gid = cpu_to_le32(i_gid_read(inode));
+./inode.c:	pi->i_links_count = cpu_to_le16(inode->i_nlink);
+./inode.c:	pi->i_size = cpu_to_le64(inode->i_size);
+./inode.c:	pi->i_blocks = cpu_to_le64(inode->i_blocks);
+./inode.c:	pi->i_atime = cpu_to_le32(inode->i_atime.tv_sec);
+./inode.c:	pi->i_ctime = cpu_to_le32(inode->i_ctime.tv_sec);
+./inode.c:	pi->i_mtime = cpu_to_le32(inode->i_mtime.tv_sec);
+./inode.c:	pi->i_generation = cpu_to_le32(inode->i_generation);
+./inode.c:	if (S_ISCHR(inode->i_mode) || S_ISBLK(inode->i_mode))
+./inode.c:		pi->dev.rdev = cpu_to_le32(inode->i_rdev);
+./inode.c:	pmfs_memlock_inode(inode->i_sb, pi);
+./inode.c: * is not on the hash-lists, and it cannot be reached
+./inode.c:	struct super_block *sb = inode->i_sb;
+./inode.c:	mutex_lock(&PMFS_SB(sb)->inode_table_mutex);
+./inode.c:		   inode->i_ino, sbi->s_free_inodes_count, sbi->s_inodes_count,
+./inode.c:		   sbi->s_free_inode_hint);
+./inode.c:	inode_nr = inode->i_ino >> PMFS_INODE_BITS;
+./inode.c:	pi = pmfs_get_inode(sb, inode->i_ino);
+./inode.c:	pi->root = 0;
+./inode.c:	/* pi->i_links_count = 0;
+./inode.c:	pi->i_xattr = 0; */
+./inode.c:	pi->i_size = 0;
+./inode.c:	pi->i_dtime = cpu_to_le32(get_seconds());
+./inode.c:	if (inode_nr < (sbi->s_free_inode_hint))
+./inode.c:		sbi->s_free_inode_hint = (inode_nr);
+./inode.c:	sbi->s_free_inodes_count += 1;
+./inode.c:	if ((sbi->s_free_inodes_count) ==
+./inode.c:	    (sbi->s_inodes_count) - PMFS_FREE_INODE_HINT_START) {
+./inode.c:		sbi->s_free_inode_hint = (PMFS_FREE_INODE_HINT_START);
+./inode.c:		   sbi->s_free_inodes_count, sbi->s_inodes_count,
+./inode.c:		   sbi->s_free_inode_hint);
+./inode.c:	mutex_unlock(&PMFS_SB(sb)->inode_table_mutex);
+./inode.c:		return ERR_PTR(-ENOMEM);
+./inode.c:	if (!(inode->i_state & I_NEW))
+./inode.c:		err = -EACCES;
+./inode.c:	inode->i_ino = ino;
+./inode.c:	struct super_block *sb = inode->i_sb;
+./inode.c:	struct pmfs_inode *pi = pmfs_get_inode(sb, inode->i_ino);
+./inode.c:	if (!inode->i_nlink && !is_bad_inode(inode)) {
+./inode.c:		if (!(S_ISREG(inode->i_mode) || S_ISDIR(inode->i_mode) ||
+./inode.c:			S_ISLNK(inode->i_mode)))
+./inode.c:		root = pi->root;
+./inode.c:		height = pi->height;
+./inode.c:		btype = pi->i_blk_type;
+./inode.c:		if (pi->i_flags & cpu_to_le32(PMFS_EOFBLOCKS_FL)) {
+./inode.c:			last_blocknr = (1UL << (pi->height * META_BLK_SHIFT))
+./inode.c:			    - 1;
+./inode.c:			if (likely(inode->i_size))
+./inode.c:				last_blocknr = (inode->i_size - 1) >>
+./inode.c:			last_blocknr = pmfs_sparse_last_blocknr(pi->height,
+./inode.c:		/* then free the blocks from the inode's b-tree */
+./inode.c:		inode->i_mtime = inode->i_ctime = current_time(inode);
+./inode.c:		inode->i_size = 0;
+./inode.c:	/* TODO: Since we don't use page-cache, do we really need the following
+./inode.c:	truncate_inode_pages(&inode->i_data, 0);
+./inode.c:	/* 1 log entry for inode-table inode, 1 lentry for inode-table b-tree */
+./inode.c:			le64_to_cpup(&pi->i_size) >> sb->s_blocksize_bits,
+./inode.c:		u64 i_size = le64_to_cpu(pi->i_size);
+./inode.c:		sbi->s_free_inode_hint = i_size >> PMFS_INODE_BITS;
+./inode.c:		pi->i_size = cpu_to_le64(i_size);
+./inode.c:		sbi->s_free_inodes_count += INODES_PER_BLOCK(pi->i_blk_type);
+./inode.c:		sbi->s_inodes_count = i_size >> PMFS_INODE_BITS;
+./inode.c:	sb = dir->i_sb;
+./inode.c:	sbi = (struct pmfs_sb_info *)sb->s_fs_info;
+./inode.c:		return ERR_PTR(-ENOMEM);
+./inode.c:	inode->i_blocks = inode->i_size = 0;
+./inode.c:	inode->i_mtime = inode->i_atime = inode->i_ctime = current_time(inode);
+./inode.c:	inode->i_generation = atomic_add_return(1, &sbi->next_generation);
+./inode.c:		inode, sbi->s_free_inodes_count, sbi->s_inodes_count,
+./inode.c:		sbi->s_free_inode_hint);
+./inode.c:	diri = pmfs_get_inode(sb, dir->i_ino);
+./inode.c:		return ERR_PTR(-EACCES);
+./inode.c:	mutex_lock(&sbi->inode_table_mutex);
+./inode.c:	i = (sbi->s_free_inode_hint);
+./inode.c:	inodes_per_block = INODES_PER_BLOCK(inode_table->i_blk_type);
+./inode.c:	num_inodes = (sbi->s_inodes_count);
+./inode.c:		end_ino = i + (inodes_per_block - (i & (inodes_per_block - 1)));
+./inode.c:			if (le16_to_cpu(pi->i_links_count) == 0 &&
+./inode.c:			(le16_to_cpu(pi->i_mode) == 0 ||
+./inode.c:			 le32_to_cpu(pi->i_dtime)))
+./inode.c:		mutex_unlock(&PMFS_SB(sb)->inode_table_mutex);
+./inode.c:	inode->i_ino = ino;
+./inode.c:	pi->i_blk_type = PMFS_DEFAULT_BLOCK_TYPE;
+./inode.c:	pi->i_flags = pmfs_mask_flags(mode, diri->i_flags);
+./inode.c:	pi->height = 0;
+./inode.c:	pi->i_dtime = 0;
+./inode.c:	sbi->s_free_inodes_count -= 1;
+./inode.c:	if (i < (sbi->s_inodes_count) - 1)
+./inode.c:		sbi->s_free_inode_hint = (i + 1);
+./inode.c:		sbi->s_free_inode_hint = (PMFS_FREE_INODE_HINT_START);
+./inode.c:	mutex_unlock(&sbi->inode_table_mutex);
+./inode.c:		pmfs_err(sb, "pmfs_new_inode failed ino %lx\n", inode->i_ino);
+./inode.c:		errval = -EINVAL;
+./inode.c:	pmfs_memunlock_inode(inode->i_sb, pi);
+./inode.c:	pi->i_links_count = cpu_to_le16(inode->i_nlink);
+./inode.c:	pmfs_memlock_inode(inode->i_sb, pi);
+./inode.c:	pmfs_memunlock_inode(inode->i_sb, pi);
+./inode.c:	pi->i_size = cpu_to_le64(inode->i_size);
+./inode.c:	pmfs_memlock_inode(inode->i_sb, pi);
+./inode.c:	pmfs_memunlock_inode(inode->i_sb, pi);
+./inode.c:	pi->i_ctime = cpu_to_le32(inode->i_ctime.tv_sec);
+./inode.c:	pi->i_mtime = cpu_to_le32(inode->i_mtime.tv_sec);
+./inode.c:	pmfs_memlock_inode(inode->i_sb, pi);
+./inode.c:	if (inode->i_ctime.tv_sec != le32_to_cpu(pi->i_ctime) ||
+./inode.c:		inode->i_mtime.tv_sec != le32_to_cpu(pi->i_mtime) ||
+./inode.c:		inode->i_size != le64_to_cpu(pi->i_size) ||
+./inode.c:		inode->i_mode != le16_to_cpu(pi->i_mode) ||
+./inode.c:		i_uid_read(inode) != le32_to_cpu(pi->i_uid) ||
+./inode.c:		i_gid_read(inode) != le32_to_cpu(pi->i_gid) ||
+./inode.c:		inode->i_nlink != le16_to_cpu(pi->i_links_count) ||
+./inode.c:		inode->i_blocks != le64_to_cpu(pi->i_blocks) ||
+./inode.c:		inode->i_atime.tv_sec != le32_to_cpu(pi->i_atime))
+./inode.c:	struct super_block *sb = inode->i_sb;
+./inode.c:	struct pmfs_inode *pi = pmfs_get_inode(sb, inode->i_ino);
+./inode.c:	 * we can do in-place atomic update */
+./inode.c:	pi->i_atime = cpu_to_le32(inode->i_atime.tv_sec);
+./inode.c:	pmfs_flush_buffer(&pi->i_atime, sizeof(pi->i_atime), true);
+./inode.c:	struct super_block *sb = inode->i_sb;
+./inode.c:	unsigned long offset = newsize & (sb->s_blocksize - 1);
+./inode.c:	if (!offset || newsize > inode->i_size)
+./inode.c:	length = sb->s_blocksize - offset;
+./inode.c:	blocknr = newsize >> sb->s_blocksize_bits;
+./inode.c:	struct super_block *sb = inode->i_sb;
+./inode.c:	mutex_lock(&sbi->s_truncate_lock);
+./inode.c:	if (list_empty(&si->i_truncated))
+./inode.c:	li = pmfs_get_truncate_item(sb, inode->i_ino);
+./inode.c:	ino_next = le64_to_cpu(li->i_next_truncate);
+./inode.c:	prev = si->i_truncated.prev;
+./inode.c:	list_del_init(&si->i_truncated);
+./inode.c:	if (prev == &sbi->s_truncate) {
+./inode.c:		head->i_next_truncate = cpu_to_le64(ino_next);
+./inode.c:		pmfs_flush_buffer(&head->i_next_truncate,
+./inode.c:			sizeof(head->i_next_truncate), false);
+./inode.c:			struct pmfs_inode_info, i_truncated)->vfs_inode;
+./inode.c:				pmfs_get_truncate_item(sb, i_prv->i_ino);
+./inode.c:		li_prv->i_next_truncate = cpu_to_le64(ino_next);
+./inode.c:		pmfs_flush_buffer(&li_prv->i_next_truncate,
+./inode.c:			sizeof(li_prv->i_next_truncate), false);
+./inode.c:	mutex_unlock(&sbi->s_truncate_lock);
+./inode.c:/* PMFS maintains a so-called truncate list, which is a linked list of inodes
+./inode.c:	struct super_block *sb = inode->i_sb;
+./inode.c:	mutex_lock(&PMFS_SB(sb)->s_truncate_lock);
+./inode.c:	if (!list_empty(&PMFS_I(inode)->i_truncated))
+./inode.c:	li = pmfs_get_truncate_item(sb, inode->i_ino);
+./inode.c:	li->i_next_truncate = head->i_next_truncate;
+./inode.c:	li->i_truncatesize = cpu_to_le64(truncate_size);
+./inode.c:	head->i_next_truncate = cpu_to_le64(inode->i_ino);
+./inode.c:	pmfs_flush_buffer(&head->i_next_truncate,
+./inode.c:		sizeof(head->i_next_truncate), false);
+./inode.c:	list_add(&PMFS_I(inode)->i_truncated, &PMFS_SB(sb)->s_truncate);
+./inode.c:	mutex_unlock(&PMFS_SB(sb)->s_truncate_lock);
+./inode.c:	loff_t oldsize = inode->i_size;
+./inode.c:	if (!(S_ISREG(inode->i_mode) || S_ISDIR(inode->i_mode) ||
+./inode.c:	      S_ISLNK(inode->i_mode))) {
+./inode.c:		pmfs_err(inode->i_sb, "%s:wrong file mode %x\n", inode->i_mode);
+./inode.c:	/* No need to make the b-tree persistent here if we are called from
+./inode.c:	inode = path->dentry->d_inode;
+./inode.c:	/* stat->blocks should be the number of 512B blocks */
+./inode.c:	stat->blocks = (inode->i_blocks << inode->i_sb->s_blocksize_bits) >> 9;
+./inode.c:			pi->i_mode = cpu_to_le16(inode->i_mode);
+./inode.c:			pi->i_uid = cpu_to_le32(i_uid_read(inode));
+./inode.c:			pi->i_gid = cpu_to_le32(i_gid_read(inode));
+./inode.c:			pi->i_size = cpu_to_le64(inode->i_size);
+./inode.c:			pi->i_atime = cpu_to_le32(inode->i_atime.tv_sec);
+./inode.c:			pi->i_ctime = cpu_to_le32(inode->i_ctime.tv_sec);
+./inode.c:			pi->i_mtime = cpu_to_le32(inode->i_mtime.tv_sec);
+./inode.c:	struct inode *inode = dentry->d_inode;
+./inode.c:	struct super_block *sb = inode->i_sb;
+./inode.c:	struct pmfs_inode *pi = pmfs_get_inode(sb, inode->i_ino);
+./inode.c:	unsigned int ia_valid = attr->ia_valid, attr_mask;
+./inode.c:		return -EACCES;
+./inode.c:	if ((ia_valid & ATTR_SIZE) && (attr->ia_size != inode->i_size ||
+./inode.c:			pi->i_flags & cpu_to_le32(PMFS_EOFBLOCKS_FL))) {
+./inode.c:		pmfs_truncate_add(inode, attr->ia_size);
+./inode.c:		pmfs_set_blocksize_hint(sb, pi, attr->ia_size);
+./inode.c:		pmfs_setsize(inode, attr->ia_size);
+./inode.c:	if ((ia_valid & (ia_valid - 1)) == 0) {
+./inode.c:	unsigned int flags = le32_to_cpu(pi->i_flags);
+./inode.c:	inode->i_flags &=
+./inode.c:		inode->i_flags |= S_SYNC;
+./inode.c:		inode->i_flags |= S_APPEND;
+./inode.c:		inode->i_flags |= S_IMMUTABLE;
+./inode.c:		inode->i_flags |= S_NOATIME;
+./inode.c:		inode->i_flags |= S_DIRSYNC;
+./inode.c:	if (!pi->i_xattr)
+./inode.c:	inode->i_flags |= S_DAX;
+./inode.c:	unsigned int flags = inode->i_flags;
+./inode.c:	unsigned int pmfs_flags = le32_to_cpu(pi->i_flags);
+./inode.c:	pi->i_flags = cpu_to_le32(pmfs_flags);
+./inode.c:	struct file *filp = iocb->ki_filp;
+./inode.c:	struct inode *inode = filp->f_mapping->host;
+./inode.c:	loff_t end = iocb->ki_pos;
+./inode.c:	ssize_t ret = -EINVAL;
+./inode.c:	unsigned long nr_segs = iter->nr_segs;
+./inode.c:	const struct iovec *iv = iter->iov;
+./inode.c:		end += iv->iov_len;
+./inode.c:	iv = iter->iov;
+./inode.c:			ret = pmfs_xip_file_read(filp, iv->iov_base,
+./inode.c:					iv->iov_len, &iocb->ki_pos);
+./inode.c:			ret = pmfs_xip_file_write(filp, iv->iov_base,
+./inode.c:					iv->iov_len, &iocb->ki_pos);
+./inode.c:		if (iter->count > iv->iov_len)
+./inode.c:			iter->count -= iv->iov_len;
+./inode.c:			iter->count = 0;
+./inode.c:		iter->nr_segs--;
+./inode.c:	if (iocb->ki_pos != end)
+./inode.c:			"but offset = %lld\n", end, iocb->ki_pos);
+./remount-pmfs.sh:mount -t pmfs /dev/pmem0 /mnt/ramdisk
+./balloc.c: * Copyright (c) 2012-2013, Intel Corporation.
+./balloc.c: * 51 Franklin St - Fifth Floor, Boston, MA 02110-1301 USA.
+./balloc.c:	num_used_block = (init_used_size + sb->s_blocksize - 1) >>
+./balloc.c:		sb->s_blocksize_bits;
+./balloc.c:	blknode->block_low = sbi->block_start;
+./balloc.c:	blknode->block_high = sbi->block_start + num_used_block - 1;
+./balloc.c:	sbi->num_free_blocks -= num_used_block;
+./balloc.c:	list_add(&blknode->link, &sbi->block_inuse_head);
+./balloc.c:	if (list_is_last(&i->link, head))
+./balloc.c:	return list_first_entry(&i->link, typeof(*i), link);
+./balloc.c:	struct list_head *head = &(sbi->block_inuse_head);
+./balloc.c:	new_block_high = blocknr + num_blocks - 1;
+./balloc.c:	    new_block_low >= (*start_hint)->block_low)
+./balloc.c:		if (new_block_low > i->block_high) {
+./balloc.c:		if ((new_block_low == i->block_low) &&
+./balloc.c:			(new_block_high == i->block_high)) {
+./balloc.c:			list_del(&i->link);
+./balloc.c:			sbi->num_blocknode_allocated--;
+./balloc.c:			sbi->num_free_blocks += num_blocks;
+./balloc.c:		if ((new_block_low == i->block_low) &&
+./balloc.c:			(new_block_high < i->block_high)) {
+./balloc.c:			i->block_low = new_block_high + 1;
+./balloc.c:			sbi->num_free_blocks += num_blocks;
+./balloc.c:		if ((new_block_low > i->block_low) && 
+./balloc.c:			(new_block_high == i->block_high)) {
+./balloc.c:			i->block_high = new_block_low - 1;
+./balloc.c:			sbi->num_free_blocks += num_blocks;
+./balloc.c:		if ((new_block_low > i->block_low) &&
+./balloc.c:			(new_block_high < i->block_high)) {
+./balloc.c:			curr_node->block_low = new_block_high + 1;
+./balloc.c:			curr_node->block_high = i->block_high;
+./balloc.c:			i->block_high = new_block_low - 1;
+./balloc.c:			list_add(&curr_node->link, &i->link);
+./balloc.c:			sbi->num_free_blocks += num_blocks;
+./balloc.c:	mutex_lock(&sbi->s_lock);
+./balloc.c:	mutex_unlock(&sbi->s_lock);
+./balloc.c:	struct list_head *head = &(sbi->block_inuse_head);
+./balloc.c:	mutex_lock(&sbi->s_lock);
+./balloc.c:		if (i->link.next == head) {
+./balloc.c:			next_block_low = sbi->block_end;
+./balloc.c:			next_i = list_entry(i->link.next, typeof(*i), link);
+./balloc.c:			next_block_low = next_i->block_low;
+./balloc.c:		new_block_low = (i->block_high + num_blocks) & ~(num_blocks - 1);
+./balloc.c:		new_block_high = new_block_low + num_blocks - 1;
+./balloc.c:			/* Does not fit - skip to next blocknode */
+./balloc.c:		if ((new_block_low == (i->block_high + 1)) &&
+./balloc.c:			(new_block_high == (next_block_low - 1)))
+./balloc.c:				i->block_high = next_i->block_high;
+./balloc.c:				list_del(&next_i->link);
+./balloc.c:				sbi->num_blocknode_allocated--;
+./balloc.c:				i->block_high = new_block_high;
+./balloc.c:		if ((new_block_low == (i->block_high + 1)) &&
+./balloc.c:			(new_block_high < (next_block_low - 1))) {
+./balloc.c:			i->block_high = new_block_high;
+./balloc.c:		if ((new_block_low > (i->block_high + 1)) &&
+./balloc.c:			(new_block_high == (next_block_low - 1))) {
+./balloc.c:				next_i->block_low = new_block_low;
+./balloc.c:					errval = -ENOSPC;
+./balloc.c:				curr_node->block_low = new_block_low;
+./balloc.c:				curr_node->block_high = new_block_high;
+./balloc.c:				list_add(&curr_node->link, &i->link);
+./balloc.c:		if ((new_block_low > (i->block_high + 1)) &&
+./balloc.c:			(new_block_high < (next_block_low - 1))) {
+./balloc.c:				errval = -ENOSPC;
+./balloc.c:			curr_node->block_low = new_block_low;
+./balloc.c:			curr_node->block_high = new_block_high;
+./balloc.c:			list_add(&curr_node->link, &i->link);
+./balloc.c:		sbi->num_free_blocks -= num_blocks;
+./balloc.c:	mutex_unlock(&sbi->s_lock);
+./balloc.c:		return -ENOSPC;
+./balloc.c:	return sbi->num_free_blocks; 
+./Makefile:# Makefile for the linux pmfs-filesystem routines.
+./Makefile:obj-m += pmfs.o
+./Makefile:pmfs-y := bbuild.o balloc.o dir.o file.o inode.o namei.o super.o symlink.o ioctl.o pmfs_stats.o journal.o xip.o wprotect.o
+./Makefile:	make -C /lib/modules/$(shell uname -r)/build M=`pwd`
+./Makefile:	make -C /lib/modules/$(shell uname -r)/build M=`pwd` clean
+./dir.c: * Copyright 2012-2013 Intel Corporation
+./dir.c: * Copyright 2009-2011 Marco Stornelli <marco.stornelli@gmail.com>
+./dir.c: * 2003-2004 (c) MontaVista Software, Inc. , Steve Longerbeam
+./dir.c:	struct inode *dir = dentry->d_parent->d_inode;
+./dir.c:	const char *name = dentry->d_name.name;
+./dir.c:	int namelen = dentry->d_name.len;
+./dir.c:		top = blk_base + dir->i_sb->s_blocksize - reclen;
+./dir.c:				return -EIO;
+./dir.c:				return -EEXIST;
+./dir.c:			rlen = le16_to_cpu(de->de_len);
+./dir.c:			if (de->ino) {
+./dir.c:				nlen = PMFS_DIR_REC_LEN(de->name_len);
+./dir.c:				if ((rlen - nlen) >= reclen)
+./dir.c:			return -ENOSPC;
+./dir.c:	rlen = le16_to_cpu(de->de_len);
+./dir.c:	if (de->ino) {
+./dir.c:		pmfs_add_logentry(dir->i_sb, trans, &de->de_len,
+./dir.c:			sizeof(de->de_len), LE_DATA);
+./dir.c:		nlen = PMFS_DIR_REC_LEN(de->name_len);
+./dir.c:		pmfs_memunlock_block(dir->i_sb, blk_base);
+./dir.c:		de1->de_len = cpu_to_le16(rlen - nlen);
+./dir.c:		de->de_len = cpu_to_le16(nlen);
+./dir.c:		pmfs_memlock_block(dir->i_sb, blk_base);
+./dir.c:		pmfs_add_logentry(dir->i_sb, trans, &de->ino,
+./dir.c:			sizeof(de->ino), LE_DATA);
+./dir.c:	pmfs_memunlock_block(dir->i_sb, blk_base);
+./dir.c:	/*de->file_type = 0;*/
+./dir.c:		de->ino = cpu_to_le64(inode->i_ino);
+./dir.c:		/*de->file_type = IF2DT(inode->i_mode); */
+./dir.c:		de->ino = 0;
+./dir.c:	de->name_len = namelen;
+./dir.c:	memcpy(de->name, name, namelen);
+./dir.c:	pmfs_memlock_block(dir->i_sb, blk_base);
+./dir.c:	dir->i_mtime = dir->i_ctime = current_time(dir);
+./dir.c:	/*dir->i_version++; */
+./dir.c:	pmfs_memunlock_inode(dir->i_sb, pidir);
+./dir.c:	pidir->i_mtime = cpu_to_le32(dir->i_mtime.tv_sec);
+./dir.c:	pidir->i_ctime = cpu_to_le32(dir->i_ctime.tv_sec);
+./dir.c:	pmfs_memlock_inode(dir->i_sb, pidir);
+./dir.c:	struct inode *dir = dentry->d_parent->d_inode;
+./dir.c:	struct super_block *sb = dir->i_sb;
+./dir.c:	int retval = -EINVAL;
+./dir.c:	if (!dentry->d_name.len)
+./dir.c:		return -EINVAL;
+./dir.c:	pidir = pmfs_get_inode(sb, dir->i_ino);
+./dir.c:	blocks = dir->i_size >> sb->s_blocksize_bits;
+./dir.c:			retval = -EIO;
+./dir.c:		if (retval != -ENOSPC)
+./dir.c:	dir->i_size += dir->i_sb->s_blocksize;
+./dir.c:		retval = -ENOSPC;
+./dir.c:	de->ino = 0;
+./dir.c:	de->de_len = cpu_to_le16(sb->s_blocksize);
+./dir.c:	struct super_block *sb = inode->i_sb;
+./dir.c:	struct inode *dir = de->d_parent->d_inode;
+./dir.c:	struct qstr *entry = &de->d_name;
+./dir.c:	int retval = -EINVAL;
+./dir.c:	if (!de->d_name.len)
+./dir.c:		return -EINVAL;
+./dir.c:	blocks = dir->i_size >> sb->s_blocksize_bits;
+./dir.c:					  block << sb->s_blocksize_bits,
+./dir.c:		pmfs_add_logentry(sb, trans, &prev_entry->de_len,
+./dir.c:				sizeof(prev_entry->de_len), LE_DATA);
+./dir.c:		prev_entry->de_len =
+./dir.c:			cpu_to_le16(le16_to_cpu(prev_entry->de_len) +
+./dir.c:				    le16_to_cpu(res_entry->de_len));
+./dir.c:		pmfs_add_logentry(sb, trans, &res_entry->ino,
+./dir.c:				sizeof(res_entry->ino), LE_DATA);
+./dir.c:		res_entry->ino = 0;
+./dir.c:	/*dir->i_version++; */
+./dir.c:	dir->i_ctime = dir->i_mtime = current_time(dir);
+./dir.c:	pidir = pmfs_get_inode(sb, dir->i_ino);
+./dir.c:	pidir->i_mtime = cpu_to_le32(dir->i_mtime.tv_sec);
+./dir.c:	pidir->i_ctime = cpu_to_le32(dir->i_ctime.tv_sec);
+./dir.c:	struct super_block *sb = inode->i_sb;
+./dir.c:	offset = ctx->pos & (sb->s_blocksize - 1);
+./dir.c:	while (ctx->pos < inode->i_size) {
+./dir.c:		unsigned long blk = ctx->pos >> sb->s_blocksize_bits;
+./dir.c:				inode->i_ino, ctx->pos);
+./dir.c:			ctx->pos += sb->s_blocksize - offset;
+./dir.c:		if (file->f_version != inode->i_version) {
+./dir.c:			for (i = 0; i < sb->s_blocksize && i < offset; ) {
+./dir.c:				 * least that it is non-zero.  A
+./dir.c:				if (le16_to_cpu(de->de_len) <
+./dir.c:				i += le16_to_cpu(de->de_len);
+./dir.c:			ctx->pos =
+./dir.c:				(ctx->pos & ~(sb->s_blocksize - 1)) | offset;
+./dir.c:			file->f_version = inode->i_version;
+./dir.c:		while (ctx->pos < inode->i_size
+./dir.c:		       && offset < sb->s_blocksize) {
+./dir.c:				ctx->pos = ALIGN(ctx->pos, sb->s_blocksize);
+./dir.c:			offset += le16_to_cpu(de->de_len);
+./dir.c:			if (de->ino) {
+./dir.c:				ino = le64_to_cpu(de->ino);
+./dir.c:				if (!dir_emit(ctx, de->name, de->name_len,
+./dir.c:					ino, IF2DT(le16_to_cpu(pi->i_mode))))
+./dir.c:			ctx->pos += le16_to_cpu(de->de_len);
+./pmfs.h: * Copyright 2012-2013 Intel Corporation
+./pmfs.h: * Copyright 2009-2011 Marco Stornelli <marco.stornelli@gmail.com>
+./pmfs.h: * 2003-2004 (c) MontaVista Software, Inc. , Steve Longerbeam
+./pmfs.h:#define test_opt(sb, opt)       (PMFS_SB(sb)->s_mount_opt & PMFS_MOUNT_ ## opt)
+./pmfs.h:/* Flags that are appropriate for regular files (all but dir-specific ones). */
+./pmfs.h:/* Flags that are appropriate for non-directories/regular files. */
+./pmfs.h:#define INODES_PER_BLOCK(bt) (1 << (blk_type_to_shift[bt] - PMFS_INODE_BITS))
+./pmfs.h:			(end.tv_sec - start.tv_sec) * 1000000000 + \
+./pmfs.h:			(end.tv_nsec - start.tv_nsec); \
+./pmfs.h:	crc = crc16(~0, (__u8 *)data + sizeof(__le16), n - sizeof(__le16));
+./pmfs.h: * PMFS super-block data in memory
+./pmfs.h:	struct mutex 	s_lock;	/* protects the SB's buffer-head */
+./pmfs.h:	return sb->s_fs_info;
+./pmfs.h:/* If this is part of a read-modify-write of the super block,
+./pmfs.h:	return (struct pmfs_super_block *)sbi->virt_addr;
+./pmfs.h:			le64_to_cpu(ps->s_journal_offset));
+./pmfs.h:			le64_to_cpu(ps->s_inode_table_offset));
+./pmfs.h:	return (struct pmfs_super_block *)(sbi->virt_addr + PMFS_SB_SIZE);
+./pmfs.h:/* If this is part of a read-modify-write of the block,
+./pmfs.h:	/* pi->i_size, pi->i_ctime, and pi->i_mtime need to be atomically updated.
+./pmfs.h:	words[0] = cpu_to_le32(inode->i_ctime.tv_sec);
+./pmfs.h:	words[1] = cpu_to_le32(inode->i_mtime.tv_sec);
+./pmfs.h:	cmpxchg_double_local(&pi->i_size, (u64 *)&pi->i_ctime, pi->i_size,
+./pmfs.h:		*(u64 *)&pi->i_ctime, new_pi_size, *(u64 *)words);
+./pmfs.h:/* assumes the length to be 4-byte aligned */
+./pmfs.h:	height = pi->height;
+./pmfs.h:	bp = le64_to_cpu(pi->root);
+./pmfs.h:		bit_shift = (height - 1) * META_BLK_SHIFT;
+./pmfs.h:		blocknr = blocknr & ((1 << bit_shift) - 1);
+./pmfs.h:		height--;
+./pmfs.h:	return blk_type_to_shift[pi->i_blk_type];
+./pmfs.h:	return blk_type_to_size[pi->i_blk_type];
+./pmfs.h:/* If this is part of a read-modify-write of the inode metadata,
+./pmfs.h:	ino_offset = (ino & (pmfs_inode_blk_size(inode_table) - 1));
+./pmfs.h:	PMFS_ASSERT((addr >= sbi->virt_addr) &&
+./pmfs.h:			(addr < (sbi->virt_addr + sbi->initsize)));
+./pmfs.h:	return (u64)(addr - sbi->virt_addr);
+./pmfs.h:	return (PMFS_SB(sb)->phys_addr + block) >> PAGE_SHIFT;
+./pmfs.h:	struct pmfs_sb_info *sbi = (struct pmfs_sb_info *)sb->s_fs_info;
+./pmfs.h:	return sbi->s_mount_opt & PMFS_MOUNT_MOUNTING;
+./pmfs.h:	if ((pi->i_flags & cpu_to_le32(PMFS_EOFBLOCKS_FL)) &&
+./pmfs.h:		(size + sb->s_blocksize) > (le64_to_cpu(pi->i_blocks)
+./pmfs.h:			<< sb->s_blocksize_bits))
+./pmfs.h:		pi->i_flags &= cpu_to_le32(~PMFS_EOFBLOCKS_FL);
+./pmfs.h:	if (len == de->name_len && de->ino && !memcmp(de->name, name, len))
+./namei.c: * Copyright 2012-2013 Intel Corporation
+./namei.c: * Copyright 2009-2011 Marco Stornelli <marco.stornelli@gmail.com>
+./namei.c: * 2003-2004 (c) MontaVista Software, Inc. , Steve Longerbeam
+./namei.c: * Couple of helper functions - make the code slightly cleaner.
+./namei.c:	if (inode->i_nlink) {
+./namei.c:	pi = pmfs_get_inode(inode->i_sb, inode->i_ino);
+./namei.c:	return (struct pmfs_direntry *)((char *)p + le16_to_cpu(p->de_len));
+./namei.c:	const int rlen = le16_to_cpu(de->de_len);
+./namei.c:	else if (unlikely(rlen < PMFS_DIR_REC_LEN(de->name_len)))
+./namei.c:	else if (unlikely((((u8 *)de - base) + rlen > dir->i_sb->s_blocksize)))
+./namei.c:		pmfs_dbg("bad entry in directory #%lu: %s - "
+./namei.c:			  dir->i_ino, error_msg, offset,
+./namei.c:			  (unsigned long)le64_to_cpu(de->ino), rlen,
+./namei.c:			  de->name_len);
+./namei.c: * Returns 0 if not found, -1 on failure, and 1 on success
+./namei.c:	const char *name = child->name;
+./namei.c:	int namelen = child->len;
+./namei.c:	dlimit = blk_base + dir->i_sb->s_blocksize;
+./namei.c:			/* found a match - just to be sure, do a full check */
+./namei.c:				return -1;
+./namei.c:		de_len = le16_to_cpu(de->de_len);
+./namei.c:			return -1;
+./namei.c:	const u8 *name = entry->name;
+./namei.c:	struct super_block *sb = dir->i_sb;
+./namei.c:	pi = pmfs_get_inode(sb, dir->i_ino);
+./namei.c:	namelen = entry->len;
+./namei.c:	nblocks = dir->i_size >> dir->i_sb->s_blocksize_bits;
+./namei.c:	start = si->i_dir_start_lookup;
+./namei.c:					  block << sb->s_blocksize_bits,
+./namei.c:			si->i_dir_start_lookup = block;
+./namei.c:			i_no = le64_to_cpu((*res_entry)->ino);
+./namei.c:	nblocks = dir->i_size >> sb->s_blocksize_bits;
+./namei.c:	if (dentry->d_name.len > PMFS_NAME_LEN)
+./namei.c:		return ERR_PTR(-ENAMETOOLONG);
+./namei.c:	ino = pmfs_inode_by_name(dir, &dentry->d_name, &de);
+./namei.c:		inode = pmfs_iget(dir->i_sb, ino);
+./namei.c:		if (inode == ERR_PTR(-ESTALE)) {
+./namei.c:			pmfs_err(dir->i_sb, __func__,
+./namei.c:			return ERR_PTR(-EIO);
+./namei.c: * is so far negative - it has no inode.
+./namei.c:	struct super_block *sb = dir->i_sb;
+./namei.c:	 * inode's b-tree, 2 lentries for logging dir entry
+./namei.c:	inode = pmfs_new_inode(trans, dir, mode, &dentry->d_name);
+./namei.c:				dentry->d_name.name, inode->i_ino);
+./namei.c:	inode->i_op = &pmfs_file_inode_operations;
+./namei.c:	inode->i_mapping->a_ops = &pmfs_aops_xip;
+./namei.c:	inode->i_fop = &pmfs_xip_file_operations;
+./namei.c:	struct super_block *sb = dir->i_sb;
+./namei.c:	 * inode's b-tree, 2 lentries for logging dir entry
+./namei.c:	inode = pmfs_new_inode(trans, dir, mode, &dentry->d_name);
+./namei.c:	inode->i_op = &pmfs_special_inode_operations;
+./namei.c:	pi = pmfs_get_inode(sb, inode->i_ino);
+./namei.c:	if (S_ISCHR(inode->i_mode) || S_ISBLK(inode->i_mode))
+./namei.c:		pi->dev.rdev = cpu_to_le32(inode->i_rdev);
+./namei.c:	struct super_block *sb = dir->i_sb;
+./namei.c:	int err = -ENAMETOOLONG;
+./namei.c:	if (len + 1 > sb->s_blocksize)
+./namei.c:	 * inode's b-tree, 2 lentries for logging dir entry
+./namei.c:	inode = pmfs_new_inode(trans, dir, S_IFLNK|S_IRWXUGO, &dentry->d_name);
+./namei.c:	inode->i_op = &pmfs_symlink_inode_operations;
+./namei.c:	inode->i_mapping->a_ops = &pmfs_aops_xip;
+./namei.c:	pi = pmfs_get_inode(sb, inode->i_ino);
+./namei.c:	inode->i_size = len;
+./namei.c:	struct inode *inode = dest_dentry->d_inode;
+./namei.c:	int err = -ENOMEM;
+./namei.c:	struct super_block *sb = inode->i_sb;
+./namei.c:	struct pmfs_inode *pi = pmfs_get_inode(sb, inode->i_ino);
+./namei.c:	if (inode->i_nlink >= PMFS_LINK_MAX)
+./namei.c:		return -EMLINK;
+./namei.c:		inode->i_ctime = current_time(inode);
+./namei.c:		pi->i_ctime = cpu_to_le32(inode->i_ctime.tv_sec);
+./namei.c:		pi->i_links_count = cpu_to_le16(inode->i_nlink);
+./namei.c:	struct inode *inode = dentry->d_inode;
+./namei.c:	int retval = -ENOMEM;
+./namei.c:	struct super_block *sb = inode->i_sb;
+./namei.c:	struct pmfs_inode *pi = pmfs_get_inode(sb, inode->i_ino);
+./namei.c:				dentry->d_name.name, inode->i_ino);
+./namei.c:	if (inode->i_nlink == 1)
+./namei.c:		pmfs_truncate_add(inode, inode->i_size);
+./namei.c:	inode->i_ctime = dir->i_ctime;
+./namei.c:	if (inode->i_nlink) {
+./namei.c:		pi->i_links_count = cpu_to_le16(inode->i_nlink);
+./namei.c:	pi->i_ctime = cpu_to_le32(inode->i_ctime.tv_sec);
+./namei.c:	struct super_block *sb = dir->i_sb;
+./namei.c:	int err = -EMLINK;
+./namei.c:	if (dir->i_nlink >= PMFS_LINK_MAX)
+./namei.c:	inode = pmfs_new_inode(trans, dir, S_IFDIR | mode, &dentry->d_name);
+./namei.c:				dentry->d_name.name, inode->i_ino);
+./namei.c:	inode->i_op = &pmfs_dir_inode_operations;
+./namei.c:	inode->i_fop = &pmfs_dir_operations;
+./namei.c:	inode->i_mapping->a_ops = &pmfs_aops_xip;
+./namei.c:	inode->i_size = sb->s_blocksize;
+./namei.c:	pmfs_memunlock_range(sb, blk_base, sb->s_blocksize);
+./namei.c:	de->ino = cpu_to_le64(inode->i_ino);
+./namei.c:	de->name_len = 1;
+./namei.c:	de->de_len = cpu_to_le16(PMFS_DIR_REC_LEN(de->name_len));
+./namei.c:	strcpy(de->name, ".");
+./namei.c:	/*de->file_type = S_IFDIR; */
+./namei.c:	de->ino = cpu_to_le64(dir->i_ino);
+./namei.c:	de->de_len = cpu_to_le16(sb->s_blocksize - PMFS_DIR_REC_LEN(1));
+./namei.c:	de->name_len = 2;
+./namei.c:	strcpy(de->name, "..");
+./namei.c:	/*de->file_type =  S_IFDIR; */
+./namei.c:	pmfs_memlock_range(sb, blk_base, sb->s_blocksize);
+./namei.c:	pi = pmfs_get_inode(sb, inode->i_ino);
+./namei.c:	pi->i_links_count = cpu_to_le16(inode->i_nlink);
+./namei.c:	pi->i_size = cpu_to_le64(inode->i_size);
+./namei.c:	pidir = pmfs_get_inode(sb, dir->i_ino);
+./namei.c:	sb = inode->i_sb;
+./namei.c:	if (inode->i_size < PMFS_DIR_REC_LEN(1) + PMFS_DIR_REC_LEN(2)) {
+./namei.c:		pmfs_dbg("bad directory (dir #%lu)-no data block",
+./namei.c:			  inode->i_ino);
+./namei.c:		pmfs_dbg("bad directory (dir #%lu)-no data block",
+./namei.c:			  inode->i_ino);
+./namei.c:	if (le64_to_cpu(de->ino) != inode->i_ino || !le64_to_cpu(de1->ino) ||
+./namei.c:	    strcmp(".", de->name) || strcmp("..", de1->name)) {
+./namei.c:		pmfs_dbg("bad directory (dir #%lu) - no `.' or `..'",
+./namei.c:			  inode->i_ino);
+./namei.c:	offset = le16_to_cpu(de->de_len) + le16_to_cpu(de1->de_len);
+./namei.c:	while (offset < inode->i_size) {
+./namei.c:					sb->s_blocksize)) {
+./namei.c:				    inode, offset >> sb->s_blocksize_bits));
+./namei.c:					  inode->i_ino, offset);
+./namei.c:				offset += sb->s_blocksize;
+./namei.c:				sb->s_blocksize);
+./namei.c:			offset = (offset | (sb->s_blocksize - 1)) + 1;
+./namei.c:		if (le64_to_cpu(de->ino))
+./namei.c:		offset += le16_to_cpu(de->de_len);
+./namei.c:	struct inode *inode = dentry->d_inode;
+./namei.c:	struct super_block *sb = inode->i_sb;
+./namei.c:	struct pmfs_inode *pi = pmfs_get_inode(sb, inode->i_ino), *pidir;
+./namei.c:	int err = -ENOTEMPTY;
+./namei.c:		return -ENOENT;
+./namei.c:				dentry->d_name.name, inode->i_ino);
+./namei.c:	if (pmfs_inode_by_name(dir, &dentry->d_name, &de) == 0)
+./namei.c:		return -ENOENT;
+./namei.c:	if (inode->i_nlink != 2)
+./namei.c:		pmfs_dbg("empty directory has nlink!=2 (%d)", inode->i_nlink);
+./namei.c:	/*inode->i_version++; */
+./namei.c:	inode->i_ctime = dir->i_ctime;
+./namei.c:	pi->i_links_count = cpu_to_le16(inode->i_nlink);
+./namei.c:	pi->i_ctime = cpu_to_le32(inode->i_ctime.tv_sec);
+./namei.c:	pmfs_truncate_add(inode, inode->i_size);
+./namei.c:	pidir = pmfs_get_inode(sb, dir->i_ino);
+./namei.c:	struct inode *old_inode = old_dentry->d_inode;
+./namei.c:	struct inode *new_inode = new_dentry->d_inode;
+./namei.c:	struct super_block *sb = old_inode->i_sb;
+./namei.c:	int err = -ENOENT;
+./namei.c:	pmfs_inode_by_name(new_dir, &new_dentry->d_name, &new_de);
+./namei.c:	pmfs_inode_by_name(old_dir, &old_dentry->d_name, &old_de);
+./namei.c:			old_dentry->d_name.name, new_dentry->d_name.name);
+./namei.c:		err = -ENOTEMPTY;
+./namei.c:		if (S_ISDIR(old_inode->i_mode) && !pmfs_empty_dir(new_inode))
+./namei.c:		if (S_ISDIR(old_inode->i_mode)) {
+./namei.c:			err = -EMLINK;
+./namei.c:			if (new_dir->i_nlink >= PMFS_LINK_MAX)
+./namei.c:	new_pidir = pmfs_get_inode(sb, new_dir->i_ino);
+./namei.c:	pi = pmfs_get_inode(sb, old_inode->i_ino);
+./namei.c:		pmfs_add_logentry(sb, trans, &new_de->ino, sizeof(new_de->ino),
+./namei.c:		pmfs_memunlock_range(sb, new_de, sb->s_blocksize);
+./namei.c:		new_de->ino = cpu_to_le64(old_inode->i_ino);
+./namei.c:		/*new_de->file_type = old_de->file_type; */
+./namei.c:		pmfs_memlock_range(sb, new_de, sb->s_blocksize);
+./namei.c:		/*new_dir->i_version++; */
+./namei.c:		new_dir->i_ctime = new_dir->i_mtime = current_time(new_dir);
+./namei.c:		pi = pmfs_get_inode(sb, new_inode->i_ino);
+./namei.c:		new_inode->i_ctime = current_time(new_inode);
+./namei.c:		if (S_ISDIR(old_inode->i_mode)) {
+./namei.c:			if (new_inode->i_nlink)
+./namei.c:		pi->i_ctime = cpu_to_le32(new_inode->i_ctime.tv_sec);
+./namei.c:		if (new_inode->i_nlink)
+./namei.c:		pi->i_links_count = cpu_to_le16(new_inode->i_nlink);
+./namei.c:		if (!new_inode->i_nlink)
+./namei.c:			pmfs_truncate_add(new_inode, new_inode->i_size);
+./namei.c:		if (S_ISDIR(old_inode->i_mode)) {
+./namei.c:			old_pidir = pmfs_get_inode(sb, old_dir->i_ino);
+./namei.c:	pmfs_inode_by_name(child->d_inode, &dotdot, &de);
+./namei.c:		return ERR_PTR(-ENOENT);
+./namei.c:	ino = le64_to_cpu(de->ino);
+./namei.c:		inode = pmfs_iget(child->d_inode->i_sb, ino);
+./namei.c:		return ERR_PTR(-ENOENT);
+./xip.c: * Copyright 2012-2013 Intel Corporation
+./xip.c: * Copyright 2009-2011 Marco Stornelli <marco.stornelli@gmail.com>
+./xip.c:	struct inode *inode = mapping->host;
+./xip.c:	end_index = (isize - 1) >> PAGE_SHIFT;
+./xip.c:			nr = ((isize - 1) & ~PAGE_MASK) + 1;
+./xip.c:		nr = nr - offset;
+./xip.c:		if (nr > len - copied)
+./xip.c:			nr = len - copied;
+./xip.c:			if (error == -ENODATA) {
+./xip.c:			error = -EFAULT;
+./xip.c:		copied += (nr - left);
+./xip.c:		offset += (nr - left);
+./xip.c:		return -EFAULT;
+./xip.c:	return do_xip_mapping_read(filp->f_mapping, &filp->f_ra, filp,
+./xip.c:	if (unlikely(((pos + len) & 0x7) && ((pos & (CACHELINE_SIZE - 1)) !=
+./xip.c:			((pos + len) & (CACHELINE_SIZE - 1)))))
+./xip.c:		copied = bytes - __copy_from_user(kmem + offset, buf, bytes);
+./xip.c:		copied = bytes - __copy_from_user_inatomic_nocache(kmem +
+./xip.c:	struct inode    *inode = mapping->host;
+./xip.c:	struct super_block *sb = inode->i_sb;
+./xip.c:	pi = pmfs_get_inode(sb, inode->i_ino);
+./xip.c:		offset = (pos & (sb->s_blocksize - 1)); /* Within page */
+./xip.c:		index = pos >> sb->s_blocksize_bits;
+./xip.c:		bytes = sb->s_blocksize - offset;
+./xip.c:				count -= status;
+./xip.c:				status = -EFAULT;
+./xip.c:	if (pos > inode->i_size) {
+./xip.c: * path we don't need to allocate any new data blocks. So the only meta-data
+./xip.c:	offset = pos & (sb->s_blocksize - 1);
+./xip.c:		ret = -EFAULT;
+./xip.c:	inode->i_ctime = inode->i_mtime = current_time(inode);
+./xip.c:	if (pos > inode->i_size) {
+./xip.c:		c_m_time = (inode->i_ctime.tv_sec & 0xFFFFFFFF);
+./xip.c:		pmfs_memcpy_atomic(&pi->i_ctime, &c_m_time, 8);
+./xip.c: * start-of-block to 'blk_off'. If it is the end block, we zero from 'blk_off' to
+./xip.c: * end-of-block
+./xip.c:		blknr = block >> (pmfs_inode_blk_shift(pi) -
+./xip.c:			sb->s_blocksize_bits);
+./xip.c:				ptr = ptr + blk_off - (blk_off % 8);
+./xip.c:				count = pmfs_inode_blk_size(pi) -
+./xip.c:				count = blk_off + (8 - (blk_off % 8));
+./xip.c:	struct address_space *mapping = filp->f_mapping;
+./xip.c:	struct inode    *inode = mapping->host;
+./xip.c:	struct super_block *sb = inode->i_sb;
+./xip.c:	sb_start_write(inode->i_sb);
+./xip.c:		ret = -EFAULT;
+./xip.c:	pi = pmfs_get_inode(sb, inode->i_ino);
+./xip.c:	offset = pos & (sb->s_blocksize - 1);
+./xip.c:	num_blocks = ((count + offset - 1) >> sb->s_blocksize_bits) + 1;
+./xip.c:	offset = pos & (pmfs_inode_blk_size(pi) - 1);
+./xip.c:	start_blk = pos >> sb->s_blocksize_bits;
+./xip.c:	end_blk = start_blk + num_blocks - 1;
+./xip.c:	same_block = (((count + offset - 1) >>
+./xip.c:	inode->i_ctime = inode->i_mtime = current_time(inode);
+./xip.c:	eblk_offset = (pos + count) & (pmfs_inode_blk_size(pi) - 1);
+./xip.c:	/* don't zero-out the allocated blocks */
+./xip.c:	sb_end_write(inode->i_sb);
+./xip.c:	struct address_space *mapping = vma->vm_file->f_mapping;
+./xip.c:	struct inode *inode = mapping->host;
+./xip.c:	size = (i_size_read(inode) + PAGE_SIZE - 1) >> PAGE_SHIFT;
+./xip.c:	if (vmf->pgoff >= size) {
+./xip.c:			__func__, __LINE__, vma->vm_start, vma->vm_end,
+./xip.c:			vmf->pgoff, (unsigned long)vmf->address, size);
+./xip.c:	err = pmfs_get_xip_mem(mapping, vmf->pgoff, 1, &xip_mem, &xip_pfn);
+./xip.c:			__func__, __LINE__, vma->vm_start, vma->vm_end,
+./xip.c:			vmf->pgoff, (unsigned long)vmf->address);
+./xip.c:			"BlockSz(0x%lx), VA(0x%lx)->PA(0x%lx)\n", __func__,
+./xip.c:			__LINE__, vma->vm_start, vma->vm_end, vmf->pgoff,
+./xip.c:			PAGE_SIZE, (unsigned long)vmf->address,
+./xip.c:	err = vm_insert_mixed(vma, (unsigned long)vmf->address,
+./xip.c:	if (err == -ENOMEM)
+./xip.c:	 * err == -EBUSY is fine, we've raced against another thread
+./xip.c:	 * that faulted-in the same page
+./xip.c:	if (err != -EBUSY)
+./xip.c:	ret = __pmfs_xip_file_fault(vmf->vma, vmf);
+./xip.c:	int err = -EIO;
+./xip.c:		struct super_block *sb = inode->i_sb;
+./xip.c:			err = -ENODATA;
+./xip.c:		pi = pmfs_get_inode(sb, inode->i_ino);
+./xip.c:			/* 1 lentry for inode, 1 lentry for inode's b-tree */
+./xip.c:			err = -ENODATA;
+./xip.c:	struct inode *inode = mapping->host;
+./xip.c:		pmfs_dbg1("[%s:%d] rc(%d), sb->physaddr(0x%llx), block(0x%llx),"
+./xip.c:			__LINE__, rc, PMFS_SB(inode->i_sb)->phys_addr,
+./xip.c:	*kmem = pmfs_get_block(inode->i_sb, block);
+./xip.c:	*pfn = pmfs_get_pfn(inode->i_sb, block);
+./xip.c:	pmfs_dbg_mmapvv("[%s:%d] sb->physaddr(0x%llx), block(0x%lx),"
+./xip.c:		PMFS_SB(inode->i_sb)->phys_addr, block, pgoff, create, *pfn);
+./xip.c://	BUG_ON(!file->f_mapping->a_ops->get_xip_mem);
+./xip.c:	vma->vm_flags |= VM_MIXEDMAP;
+./xip.c:	vma->vm_ops = &pmfs_xip_vm_ops;
+./xip.c:			__LINE__, vma->vm_start, vma->vm_end,
+./xip.c:			vma->vm_flags, pgprot_val(vma->vm_page_prot));
+./file.c: * Copyright 2012-2013 Intel Corporation
+./file.c: * Copyright 2009-2011 Marco Stornelli <marco.stornelli@gmail.com>
+./file.c: * 2003-2004 (c) MontaVista Software, Inc. , Steve Longerbeam
+./file.c:	if (le64_to_cpu(pi->root))
+./file.c:		new_size, pi->i_size, le64_to_cpu(pi->root));
+./file.c:	pi->i_blk_type = block_type;
+./file.c:	struct inode *inode = file->f_path.dentry->d_inode;
+./file.c:	struct super_block *sb = inode->i_sb;
+./file.c:		return -EOPNOTSUPP;
+./file.c:	if (S_ISDIR(inode->i_mode))
+./file.c:		return -ENODEV;
+./file.c:	if (!(mode & FALLOC_FL_KEEP_SIZE) && new_size > inode->i_size) {
+./file.c:	pi = pmfs_get_inode(sb, inode->i_ino);
+./file.c:		ret = -EACCES;
+./file.c:	blocksize_mask = sb->s_blocksize - 1;
+./file.c:	blocknr = offset >> sb->s_blocksize_bits;
+./file.c:	num_blocks = (blockoff + len + blocksize_mask) >> sb->s_blocksize_bits;
+./file.c:	inode->i_mtime = inode->i_ctime = current_time(inode);
+./file.c:		pi->i_flags |= cpu_to_le32(PMFS_EOFBLOCKS_FL);
+./file.c:	if (!(mode & FALLOC_FL_KEEP_SIZE) && new_size > inode->i_size) {
+./file.c:		inode->i_size = new_size;
+./file.c:		pi->i_size = cpu_to_le64(inode->i_size);
+./file.c:	pi->i_mtime = cpu_to_le32(inode->i_mtime.tv_sec);
+./file.c:	pi->i_ctime = cpu_to_le32(inode->i_ctime.tv_sec);
+./file.c:	struct inode *inode = file->f_path.dentry->d_inode;
+./file.c:	if ((offset < 0 && !(file->f_mode & FMODE_UNSIGNED_OFFSET)) ||
+./file.c:	    offset > inode->i_sb->s_maxbytes) {
+./file.c:		return -EINVAL;
+./file.c:	if (offset != file->f_pos) {
+./file.c:		file->f_pos = offset;
+./file.c:		file->f_version = 0;
+./file.c:	struct address_space *mapping = file->f_mapping;
+./file.c:	struct inode *inode = mapping->host;
+./file.c:		return -ENODATA;
+./file.c:		nr_flush_bytes = PAGE_SIZE - offset;
+./file.c:		if (nr_flush_bytes > (end - start))
+./file.c:			nr_flush_bytes = end - start;
+./file.c:			xip_mem = pmfs_get_block(inode->i_sb, block);
+./file.c:	if (file->f_mode & FMODE_WRITE) {
+./file.c:	struct mm_struct *mm = current->mm;
+./file.c:	struct inode *inode = file->f_mapping->host;
+./file.c:	struct pmfs_inode *pi = pmfs_get_inode(inode->i_sb, inode->i_ino);
+./file.c:		return -ENOMEM;
+./file.c:	if (pi->i_blk_type == PMFS_BLOCK_TYPE_1G)
+./file.c:	else if (pi->i_blk_type == PMFS_BLOCK_TYPE_2M)
+./file.c:		if (len & (align_size - 1))
+./file.c:			return -EINVAL;
+./file.c:		if (addr & (align_size - 1))
+./file.c:			return -EINVAL;
+./file.c:		if (TASK_SIZE - len >= addr &&
+./file.c:		    (!vma || addr + len <= vma->vm_start))
+./file.c:	info.align_mask = align_size - 1;
+./Kconfig:	   system memory) and non-volatile byte-addressable memory and you wish to
+./Kconfig:	   mount a light-weight, full-featured, and space-efficient filesystem over
+./Kconfig:	bool "Execute-in-place in PMFS"
+./journal.c: * meta-data to facilitate consistent meta-data updates against arbitrary
+./journal.c: * Copyright (c) 2012-2013, Intel Corporation.
+./journal.c: * 51 Franklin St - Fifth Floor, Boston, MA 02110-1301 USA.
+./journal.c:	pmfs_logentry_t *le = trans->start_addr;
+./journal.c:	for (i = 0; i < trans->num_entries; i++) {
+./journal.c:			le->addr_offset, le->transaction_id, le->gen_id,
+./journal.c:			le->type, le->size);
+./journal.c:	le_off = le_off - LOGENTRY_SIZE;
+./journal.c:	gen_id--;
+./journal.c:		gen_id--;
+./journal.c:	if (le->size > 0) {
+./journal.c:		data = pmfs_get_block(sb, le64_to_cpu(le->addr_offset));
+./journal.c:		pmfs_memunlock_range(sb, data, le->size);
+./journal.c:		memcpy(data, le->data, le->size);
+./journal.c:		pmfs_memlock_range(sb, data, le->size);
+./journal.c:		pmfs_flush_buffer(data, le->size, false);
+./journal.c:	uint16_t gen_id = trans->gen_id;
+./journal.c:	le = trans->start_addr + trans->num_used;
+./journal.c:	le--;
+./journal.c:	for (i = trans->num_used - 1; i >= 0; i--, le--) {
+./journal.c:		if (gen_id == le16_to_cpu(le->gen_id))
+./journal.c:	pmfs_logentry_t *le = trans->start_addr;
+./journal.c:	for (i = 0; i < trans->num_used; i++, le++) {
+./journal.c:		if (le->size) {
+./journal.c:			data = pmfs_get_block(sb,le64_to_cpu(le->addr_offset));
+./journal.c:			if (sbi->redo_log) {
+./journal.c:				pmfs_memunlock_range(sb, data, le->size);
+./journal.c:				memcpy(data, le->data, le->size);
+./journal.c:				pmfs_memlock_range(sb, data, le->size);
+./journal.c:				pmfs_flush_buffer(data, le->size, false);
+./journal.c:	le->gen_id = 0;
+./journal.c:	pmfs_logentry_t *le = trans->start_addr;
+./journal.c:	pmfs_memunlock_range(sb, trans->start_addr,
+./journal.c:			trans->num_entries * LOGENTRY_SIZE);
+./journal.c:	for (i = 0; i < trans->num_entries; i++) {
+./journal.c:		if (le->type == LE_START) {
+./journal.c:	pmfs_memlock_range(sb, trans->start_addr,
+./journal.c:			trans->num_entries * LOGENTRY_SIZE);
+./journal.c:	pmfs_logentry_t *le = trans->start_addr;
+./journal.c:	uint16_t gen_id = trans->gen_id;
+./journal.c:	for (i = 0; i < trans->num_entries; i++) {
+./journal.c:		if (gen_id == le16_to_cpu(le->gen_id) && le->size > 0) {
+./journal.c:			data = pmfs_get_block(sb,le64_to_cpu(le->addr_offset));
+./journal.c:				pmfs_memunlock_range(sb, data, le->size);
+./journal.c:				memcpy(data, le->data, le->size);
+./journal.c:				pmfs_memlock_range(sb, data, le->size);
+./journal.c:			pmfs_flush_buffer(data, le->size, false);
+./journal.c:	uint16_t gen_id = le16_to_cpu(le->gen_id);
+./journal.c:	trans.transaction_id = le32_to_cpu(le->transaction_id);
+./journal.c:		if (gen_id == le16_to_cpu(le->gen_id)) {
+./journal.c:			if (le->type & LE_COMMIT || le->type & LE_ABORT)
+./journal.c:			if (le->type & LE_START) {
+./journal.c:		le--;
+./journal.c:		if ((gen_id == le16_to_cpu(le->gen_id))
+./journal.c:			&& (le->type & LE_COMMIT || le->type & LE_ABORT)) {
+./journal.c:				le32_to_cpu(le->transaction_id));
+./journal.c:		tail = prev_log_entry(sbi->jsize, tail);
+./journal.c:	gen_id = le16_to_cpu(le->gen_id);
+./journal.c:	if (!(le->type & LE_START)) {
+./journal.c:				le32_to_cpu(le->transaction_id), gen_id);
+./journal.c:		return next_log_entry(sbi->jsize, new_head);
+./journal.c:	trans.transaction_id = le32_to_cpu(le->transaction_id);
+./journal.c:		new_head = next_log_entry(sbi->jsize, new_head);
+./journal.c:		if ((gen_id == le16_to_cpu(le->gen_id)) && (le->type & LE_COMMIT
+./journal.c:					|| le->type & LE_ABORT)) {
+./journal.c:			if ((le->type & LE_COMMIT) && sbi->redo_log)
+./journal.c:				if ((le->type & LE_COMMIT) && sbi->redo_log) {
+./journal.c:		if ((new_head == tail) || ((gen_id == le16_to_cpu(le->gen_id))
+./journal.c:			    && (le->type & LE_START))) {
+./journal.c:		mutex_lock(&sbi->journal_mutex);
+./journal.c:	head = le32_to_cpu(journal->head);
+./journal.c:	ptr_tail_genid = (volatile __le64 *)&journal->tail;
+./journal.c:		le = (pmfs_logentry_t *)(sbi->journal_base_addr + head);
+./journal.c:		if (gen_id == le16_to_cpu(le->gen_id)) {
+./journal.c:			head = next_log_entry(sbi->jsize, head);
+./journal.c:	journal->head = cpu_to_le32(head);
+./journal.c:	pmfs_flush_buffer(&journal->head, sizeof(journal->head), true);
+./journal.c:		if (journal->head != journal->tail)
+./journal.c:			le32_to_cpu(journal->head), le32_to_cpu(journal->tail));
+./journal.c:		mutex_unlock(&sbi->journal_mutex);
+./journal.c:	prepare_to_wait(&sbi->log_cleaner_wait, &wait, TASK_INTERRUPTIBLE);
+./journal.c:	finish_wait(&sbi->log_cleaner_wait, &wait);
+./journal.c:	init_waitqueue_head(&sbi->log_cleaner_wait);
+./journal.c:	sbi->log_cleaner_thread = kthread_run(pmfs_log_cleaner, sb,
+./journal.c:			"pmfs_log_cleaner_0x%llx", sbi->phys_addr);
+./journal.c:	if (IS_ERR(sbi->log_cleaner_thread)) {
+./journal.c:		ret = -1;
+./journal.c:	sbi->next_transaction_id = 0;
+./journal.c:	sbi->journal_base_addr = pmfs_get_block(sb,le64_to_cpu(journal->base));
+./journal.c:	sbi->jsize = le32_to_cpu(journal->size);
+./journal.c:	mutex_init(&sbi->journal_mutex);
+./journal.c:	sbi->redo_log = !!le16_to_cpu(journal->redo_logging);
+./journal.c:	journal->base = cpu_to_le64(base);
+./journal.c:	journal->size = cpu_to_le32(size);
+./journal.c:	journal->gen_id = cpu_to_le16(1);
+./journal.c:	journal->head = journal->tail = 0;
+./journal.c:	journal->redo_logging = 0;
+./journal.c:	sbi->journal_base_addr = pmfs_get_block(sb, base);
+./journal.c:	pmfs_memunlock_range(sb, sbi->journal_base_addr, size);
+./journal.c:	memset_nt(sbi->journal_base_addr, 0, size);
+./journal.c:	pmfs_memlock_range(sb, sbi->journal_base_addr, size);
+./journal.c:	if (!waitqueue_active(&sbi->log_cleaner_wait))
+./journal.c:	wake_up_interruptible(&sbi->log_cleaner_wait);
+./journal.c:	if (sbi->log_cleaner_thread)
+./journal.c:		kthread_stop(sbi->log_cleaner_thread);
+./journal.c:	return (pmfs_transaction_t *)current->journal_info;
+./journal.c:		BUG_ON(trans->t_journal != journal);
+./journal.c:	/* If it is an undo log, need one more log-entry for commit record */
+./journal.c:	if (!sbi->redo_log)
+./journal.c:		return ERR_PTR(-ENOMEM);
+./journal.c:	trans->num_used = 0;
+./journal.c:	trans->num_entries = max_log_entries;
+./journal.c:	trans->t_journal = journal;
+./journal.c:	mutex_lock(&sbi->journal_mutex);
+./journal.c:	tail = le32_to_cpu(journal->tail);
+./journal.c:	head = le32_to_cpu(journal->head);
+./journal.c:	trans->transaction_id = sbi->next_transaction_id++;
+./journal.c:	trans->gen_id = le16_to_cpu(journal->gen_id);
+./journal.c:		(sbi->jsize - (tail - head)) : (head - tail);
+./journal.c:	avail_size = avail_size - LOGENTRY_SIZE;
+./journal.c:	base = le64_to_cpu(journal->base) + tail;
+./journal.c:	if (tail >= sbi->jsize) {
+./journal.c:		ptr = (u64 *)&journal->tail;
+./journal.c:		/* writing 8-bytes atomically setting tail to 0 */
+./journal.c:					le16_to_cpu(journal->gen_id)) << 32));
+./journal.c:			le32_to_cpu(journal->tail),le16_to_cpu(journal->gen_id),
+./journal.c:				sbi->next_transaction_id - 1);
+./journal.c:		journal->tail = cpu_to_le32(tail);
+./journal.c:	pmfs_flush_buffer(&journal->tail, sizeof(u64), false);
+./journal.c:	mutex_unlock(&sbi->journal_mutex);
+./journal.c:	avail_size = avail_size - req_size;
+./journal.c:	if ((sbi->jsize - avail_size) > (sbi->jsize >> 3))
+./journal.c:		trans->transaction_id, max_log_entries, avail_size, base);
+./journal.c:	trans->start_addr = pmfs_get_block(sb, base);
+./journal.c:	trans->parent = (pmfs_transaction_t *)current->journal_info;
+./journal.c:	current->journal_info = trans;
+./journal.c:	mutex_unlock(&sbi->journal_mutex);
+./journal.c:		le64_to_cpu(journal->base), le32_to_cpu(journal->size),
+./journal.c:		le32_to_cpu(journal->head), le32_to_cpu(journal->tail),
+./journal.c:	return ERR_PTR(-EAGAIN);
+./journal.c:	if (sbi->redo_log) {
+./journal.c:		le->type |= LE_COMMIT;
+./journal.c:		le->gen_id = cpu_to_le16(trans->gen_id);
+./journal.c:		le->type |= LE_COMMIT;
+./journal.c:		le->gen_id = cpu_to_le16(trans->gen_id);
+./journal.c:		return -EINVAL;
+./journal.c:	le = trans->start_addr + trans->num_used;
+./journal.c:		num_les = (size + sizeof(le->data) - 1)/sizeof(le->data);
+./journal.c:		trans->transaction_id, size, trans->num_entries,
+./journal.c:		trans->num_used, le);
+./journal.c:	if ((trans->num_used + num_les) > trans->num_entries) {
+./journal.c:			trans->transaction_id, trans->num_entries,
+./journal.c:			trans->num_used, size);
+./journal.c:		return -ENOMEM;
+./journal.c:		le->addr_offset = cpu_to_le64(le_start);
+./journal.c:		le->transaction_id = cpu_to_le32(trans->transaction_id);
+./journal.c:		le_size = (i == (num_les - 1)) ? size : sizeof(le->data);
+./journal.c:		le->size = le_size;
+./journal.c:		size -= le_size;
+./journal.c:			memcpy(le->data, addr, le_size);
+./journal.c:		le->type = type;
+./journal.c:		if (i == 0 && trans->num_used == 0)
+./journal.c:			le->type |= LE_START;
+./journal.c:		trans->num_used++;
+./journal.c:		if (i == (num_les - 1) && (type & LE_COMMIT)) {
+./journal.c:		le->gen_id = cpu_to_le16(trans->gen_id);
+./journal.c:	if (!sbi->redo_log) {
+./journal.c:	/* Add the commit log-entry */
+./journal.c:		trans->transaction_id);
+./journal.c:	current->journal_info = trans->parent;
+./journal.c:		trans->transaction_id, trans->start_addr, trans->num_entries,
+./journal.c:		trans->num_used, trans->gen_id);
+./journal.c:	if (!sbi->redo_log) {
+./journal.c:	current->journal_info = trans->parent;
+./journal.c:	pmfs_memunlock_range(sb, start, jsize - jtail);
+./journal.c:	pmfs_memlock_range(sb, start, jsize - jtail);
+./journal.c:	uint16_t gen_id = le16_to_cpu(journal->gen_id);
+./journal.c:		invalidate_remaining_journal(sb, sbi->journal_base_addr,
+./journal.c:			le32_to_cpu(journal->tail), sbi->jsize);
+./journal.c:	journal->gen_id = cpu_to_le16(gen_id);
+./journal.c:	journal->head = journal->tail;
+./journal.c:	uint32_t tail = le32_to_cpu(journal->tail);
+./journal.c:	uint32_t head = le32_to_cpu(journal->head);
+./journal.c:	uint16_t gen_id = le16_to_cpu(journal->gen_id);
+./journal.c:		tail = prev_log_entry(sbi->jsize, tail);
+./journal.c:		le = (pmfs_logentry_t *)(sbi->journal_base_addr + tail);
+./journal.c:		if (gen_id == le16_to_cpu(le->gen_id)) {
+./journal.c:	uint32_t tail = le32_to_cpu(journal->tail);
+./journal.c:	uint32_t head = le32_to_cpu(journal->head);
+./journal.c:	uint16_t gen_id = le16_to_cpu(journal->gen_id);
+./journal.c:		le = (pmfs_logentry_t *)(sbi->journal_base_addr + head);
+./journal.c:		if (gen_id == le16_to_cpu(le->gen_id)) {
+./journal.c:			head = next_log_entry(sbi->jsize, head);
+./journal.c:	uint32_t tail = le32_to_cpu(journal->tail);
+./journal.c:	uint32_t head = le32_to_cpu(journal->head);
+./journal.c:	uint16_t gen_id = le16_to_cpu(journal->gen_id);
+./journal.c:	if (sbi->redo_log)
+./symlink.c: * Copyright 2012-2013 Intel Corporation
+./symlink.c: * Copyright 2009-2011 Marco Stornelli <marco.stornelli@gmail.com>
+./symlink.c: * 2003-2004 (c) MontaVista Software, Inc. , Steve Longerbeam
+./symlink.c:	struct super_block *sb = inode->i_sb;
+./symlink.c:		len = -EFAULT;
+./symlink.c:	struct inode *inode = dentry->d_inode;
+./symlink.c:	struct super_block *sb = inode->i_sb;
+./symlink.c:	struct super_block *sb = inode->i_sb;
+./bbuild.c: * Copyright (c) 2012-2013, Intel Corporation.
+./bbuild.c: * 51 Franklin St - Fifth Floor, Boston, MA 02110-1301 USA.
+./bbuild.c:	num_blocknode = sbi->num_blocknode_allocated;
+./bbuild.c:	sbi->num_blocknode_allocated = 0;
+./bbuild.c:		blknode->block_low = le64_to_cpu(p[index].block_low);
+./bbuild.c:		blknode->block_high = le64_to_cpu(p[index].block_high);
+./bbuild.c:		list_add_tail(&blknode->link, &sbi->block_inuse_head);
+./bbuild.c:	if (!pi->root)
+./bbuild.c:	sbi->num_blocknode_allocated =
+./bbuild.c:		le64_to_cpu(super->s_num_blocknode_allocated);
+./bbuild.c:	sbi->num_free_blocks = le64_to_cpu(super->s_num_free_blocks);
+./bbuild.c:	sbi->s_inodes_count = le32_to_cpu(super->s_inodes_count);
+./bbuild.c:	sbi->s_free_inodes_count = le32_to_cpu(super->s_free_inodes_count);
+./bbuild.c:	sbi->s_inodes_used_count = le32_to_cpu(super->s_inodes_used_count);
+./bbuild.c:	sbi->s_free_inode_hint = le32_to_cpu(super->s_free_inode_hint);
+./bbuild.c:	root = pi->root;
+./bbuild.c:	height = pi->height;
+./bbuild.c:	btype = pi->i_blk_type;
+./bbuild.c:	/* pi->i_size can not be zero */
+./bbuild.c:	last_blocknr = (le64_to_cpu(pi->i_size) - 1) >>
+./bbuild.c:	pi->i_mode = 0;
+./bbuild.c:	pi->i_links_count = cpu_to_le16(1);
+./bbuild.c:	pi->i_blk_type = PMFS_BLOCK_TYPE_4K;
+./bbuild.c:	pi->i_flags = 0;
+./bbuild.c:	pi->height = 0;
+./bbuild.c:	pi->i_dtime = 0; 
+./bbuild.c:	pi->i_size = cpu_to_le64(num_blocks << sb->s_blocksize_bits);
+./bbuild.c:	struct list_head *head = &(sbi->block_inuse_head);
+./bbuild.c:	num_blocks = ((sbi->num_blocknode_allocated * sizeof(struct 
+./bbuild.c:		pmfs_blocknode_lowhigh) - 1) >> sb->s_blocksize_bits) + 1;
+./bbuild.c:	/* 2 log entry for inode, 2 lentry for super-block */
+./bbuild.c:		p[j].block_low = cpu_to_le64(i->block_low);
+./bbuild.c:		p[j].block_high = cpu_to_le64(i->block_high);
+./bbuild.c:	pmfs_add_logentry(sb, trans, &super->s_wtime,
+./bbuild.c:	pmfs_memunlock_range(sb, &super->s_wtime, PMFS_FAST_MOUNT_FIELD_SIZE);
+./bbuild.c:	super->s_wtime = cpu_to_le32(get_seconds());
+./bbuild.c:	super->s_num_blocknode_allocated = 
+./bbuild.c:			cpu_to_le64(sbi->num_blocknode_allocated);
+./bbuild.c:	super->s_num_free_blocks = cpu_to_le64(sbi->num_free_blocks);
+./bbuild.c:	super->s_inodes_count = cpu_to_le32(sbi->s_inodes_count);
+./bbuild.c:	super->s_free_inodes_count = cpu_to_le32(sbi->s_free_inodes_count);
+./bbuild.c:	super->s_inodes_used_count = cpu_to_le32(sbi->s_inodes_used_count);
+./bbuild.c:	super->s_free_inode_hint = cpu_to_le32(sbi->s_free_inode_hint);
+./bbuild.c:	pmfs_memlock_range(sb, &super->s_wtime, PMFS_FAST_MOUNT_FIELD_SIZE);
+./bbuild.c:			set_bit(block >> PAGE_SHIFT, bm->bitmap_4k);
+./bbuild.c:			set_bit(block >> PAGE_SHIFT_2M, bm->bitmap_2M);
+./bbuild.c:			set_bit(block >> PAGE_SHIFT_1G, bm->bitmap_1G);
+./bbuild.c:	set_bit(block >> PAGE_SHIFT, bm->bitmap_4k);
+./bbuild.c:			le64_to_cpu(node[i]), height - 1, btype);
+./bbuild.c:	if (pi->root == 0)
+./bbuild.c:	pmfs_inode_crawl_recursive(sb, bm, le64_to_cpu(pi->root), pi->height,
+./bbuild.c:					pi->i_blk_type);
+./bbuild.c:			set_bit(block >> PAGE_SHIFT_2M, bm->bitmap_2M);
+./bbuild.c:			set_bit(block >> PAGE_SHIFT, bm->bitmap_4k);
+./bbuild.c:		sbi->s_inodes_count += inodes_per_block;
+./bbuild.c:			if (le16_to_cpu(pi->i_links_count) == 0 &&
+./bbuild.c:                        	(le16_to_cpu(pi->i_mode) == 0 ||
+./bbuild.c:                         	le32_to_cpu(pi->i_dtime))) {
+./bbuild.c:			sbi->s_inodes_used_count++;
+./bbuild.c:	set_bit(block >> PAGE_SHIFT, bm->bitmap_4k);
+./bbuild.c:			le64_to_cpu(node[i]), height - 1, btype);
+./bbuild.c:	struct list_head *head = &(sbi->block_inuse_head);
+./bbuild.c:	num_blocks = high - low + 1;
+./bbuild.c:		if (i->link.next == head) {
+./bbuild.c:			next_block_low = sbi->block_end;
+./bbuild.c:			next_i = list_entry(i->link.next, typeof(*i), link);
+./bbuild.c:			next_block_low = next_i->block_low;
+./bbuild.c:			/* Does not fit - skip to next blocknode */
+./bbuild.c:		if ((new_block_low == (i->block_high + 1)) &&
+./bbuild.c:			(new_block_high == (next_block_low - 1)))
+./bbuild.c:				i->block_high = next_i->block_high;
+./bbuild.c:				list_del(&next_i->link);
+./bbuild.c:				i->block_high = new_block_high;
+./bbuild.c:		if ((new_block_low == (i->block_high + 1)) &&
+./bbuild.c:			(new_block_high < (next_block_low - 1))) {
+./bbuild.c:			i->block_high = new_block_high;
+./bbuild.c:		if ((new_block_low > (i->block_high + 1)) &&
+./bbuild.c:			(new_block_high == (next_block_low - 1))) {
+./bbuild.c:				next_i->block_low = new_block_low;
+./bbuild.c:					errval = -ENOSPC;
+./bbuild.c:				curr_node->block_low = new_block_low;
+./bbuild.c:				curr_node->block_high = new_block_high;
+./bbuild.c:				list_add(&curr_node->link, &i->link);
+./bbuild.c:		if ((new_block_low > (i->block_high + 1)) &&
+./bbuild.c:			(new_block_high < (next_block_low - 1))) {
+./bbuild.c:				errval = -ENOSPC;
+./bbuild.c:			curr_node->block_low = new_block_low;
+./bbuild.c:			curr_node->block_high = new_block_high;
+./bbuild.c:			list_add(&curr_node->link, &i->link);
+./bbuild.c:		sbi->num_free_blocks -= num_blocks;
+./bbuild.c:		return -ENOSPC;
+./bbuild.c:				(next << scale) - 1)) {
+./bbuild.c:			printk("PMFS: Error could not insert 0x%lx-0x%lx\n",
+./bbuild.c:				low << scale, ((next << scale) - 1));
+./bbuild.c:	__pmfs_build_blocknode_map(sb, bm->bitmap_4k, bm->bitmap_4k_size * 8,
+./bbuild.c:		PAGE_SHIFT - 12);
+./bbuild.c:	__pmfs_build_blocknode_map(sb, bm->bitmap_2M, bm->bitmap_2M_size * 8,
+./bbuild.c:		PAGE_SHIFT_2M - 12);
+./bbuild.c:	__pmfs_build_blocknode_map(sb, bm->bitmap_1G, bm->bitmap_1G_size * 8,
+./bbuild.c:		PAGE_SHIFT_1G - 12);
+./bbuild.c:	unsigned long initsize = le64_to_cpu(super->s_size);
+./bbuild.c:	mutex_init(&sbi->inode_table_mutex);
+./bbuild.c:	sbi->block_start = (unsigned long)0;
+./bbuild.c:	sbi->block_end = ((unsigned long)(initsize) >> PAGE_SHIFT);
+./bbuild.c:	pmfs_inode_table_crawl_recursive(sb, &bm, le64_to_cpu(pi->root),
+./bbuild.c:						pi->height, pi->i_blk_type);
+./bbuild.c:	/* Reserving tow inodes - Inode 0 and Inode for datablock */
+./bbuild.c:	sbi->s_free_inodes_count = sbi->s_inodes_count -  
+./bbuild.c:		(sbi->s_inodes_used_count + 2);
+./bbuild.c:	sbi->s_free_inode_hint = PMFS_FREE_INODE_HINT_START;
+./bbuild.c:	sbi->num_free_blocks = ((unsigned long)(initsize) >> PAGE_SHIFT);
+./bbuild.c:	pmfs_init_blockmap(sb, le64_to_cpu(journal->base) + sbi->jsize);
+./bbuild.c:			(end.tv_sec - start.tv_sec) * 1000000000 +
+./bbuild.c:			(end.tv_nsec - start.tv_nsec);
+./journal.h: * Copyright (c) 2012-2013, Intel Corporation.
+./journal.h: * 51 Franklin St - Fifth Floor, Boston, MA 02110-1301 USA.
+./journal.h:#define CACHELINE_MASK  (~(CACHELINE_SIZE - 1))
+./journal.h:#define CACHELINE_ALIGN(addr) (((addr)+CACHELINE_SIZE-1) & CACHELINE_MASK)
+./journal.h:#define MAX_GEN_ID  ((uint16_t)-1)
+./journal.h:/* persistent data structure to describe a single log-entry */
