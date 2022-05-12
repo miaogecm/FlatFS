@@ -2,7 +2,7 @@
 
 ## Introduction
 
-FlatFS is a metadata-optimized file system built for fast non-volatile memory systems. FlatFS features a flat file system namespace design and incorporates three core techniques: coordinated path walk model, range-optimized B^r tree, and write-optimized compressed index key. This artifact provides both FlatFS source code and scripts to reproduce the main experiment results.
+FlatFS is a metadata-optimized file system built for fast non-volatile memory (NVM) systems. FlatFS features a flat file system namespace design and incorporates three core techniques: coordinated path walk model, range-optimized B^r tree, and write-optimized compressed index key. 
 
 ## Building FlatFS
 
@@ -42,7 +42,7 @@ Security options/TOMOYO Linux support
 Security options/Security hooks for pathname based access control
 ```
 
-Compile the kernel: `make -j 48`
+Compile the kernel: `make -j`
 
 Install the kernel: `make install`, `make modules_install`
 
@@ -61,6 +61,10 @@ The `evaluation/examples` directory contains several examples to run FlatFS.
 #### 5. Umount FlatFS
 
 please run `umount /mnt/flatfs`.
+
+## Publication
+
+Miao Cai, Junru Shen, Bin Tang, Hao Huang, Baoliu Ye. FlatFS: Flatten Hierarchical File System Namespace for Non-volatile Memories, *USENIX Annual Technical Conference* (USENIX ATC), CARLSBAD, CA, USA. July 11-13, 2022.
 
 ## Authors
 
