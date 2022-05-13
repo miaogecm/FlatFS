@@ -1,0 +1,5 @@
+set hive.fetch.task.conversion=more;
+
+use tpch;
+
+SELECT * FROM lineitem WHERE l_linenumber > 50000;

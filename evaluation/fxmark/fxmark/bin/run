@@ -1,0 +1,15 @@
+#!/bin/bash
+
+#./fxmark --type MRPL --duration 1 --ncore 4 --nbg 1 --root /mnt/$1/test
+#./fxmark --type MWRM --duration 1 --ncore 4 --nbg 1 --root /mnt/$1/test
+#./fxmark --type MWUL --duration 1 --ncore 1 --nbg 1 --root /mnt/$1/test
+#./fxmark --type MWCM --duration 10 --ncore 24 --nbg 1 --root /mnt/$1/test
+#./fxmark --type MWCM_RND --duration 10 --ncore 24 --nbg 1 --root /mnt/$1/test
+#./fxmark --type MWRL --duration 1 --ncore 1 --nbg 1 --root /mnt/$1/test
+#./fxmark --type MWCL --duration 1 --ncore 1 --nbg 1 --root /mnt/$1/test
+# ./fxmark --type MRPH --duration 1 --ncore 1 --nbg 1 --root /mnt/$1/test
+#./fxmark --type MRDL --duration 1 --ncore 4 --nbg 1 --root /mnt/$1/test
+#./fxmark --type MRDM --duration 1 --ncore 1 --nbg 1 --root /mnt/$1/test
+./fxmark --type MWUM --duration 100 --ncore 24 --nbg 1 --root /mnt/$1/test
+# ./fxmark --type MRPM --duration 1 --ncore 1 --nbg 1 --root /mnt/$1/test
+

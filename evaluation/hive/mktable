@@ -1,0 +1,9 @@
+#!/bin/bash
+
+. ../common/color.sh
+
+cat tbl_init.hive | sed -e "s|\${TBL_PATH}|$TBL_PATH|g" > .tbl_init.hive
+
+echo -e "${COLOR_CYAN}Creating table... Wait about 2 minutes.${COLOR_CLEAR}"
+hive -f .tbl_init.hive
+echo -e "${COLOR_GREEN}Create table OK!${COLOR_CLEAR}"

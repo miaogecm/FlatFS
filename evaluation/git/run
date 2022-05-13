@@ -1,0 +1,69 @@
+#!/bin/bash
+
+. ../common/color.sh
+
+# The dataset is ten hadoop-2.10.1 source code directory trees. If you run this experiment  
+# on your machine, please download hadoop-2.10.1 source code tree and make ten copies, 
+# then modify following $hadoop_src with your dataset directory path.
+hadoop_src=/home/flatfs/Desktop/Experiment/home/user/Projects/mo-fs/application/hadoop
+git=git_slient
+
+if [[ $1 == flatfs_opt ]]; then
+    fs=flatfs
+    git=git_opt
+else
+    fs=$1
+fi
+
+. ../common/fs/$fs.sh
+
+fs_mount
+
+dir=$M/atc22/experiment/data/application/git/hadoop
+
+# prepare data
+echo -e "${COLOR_CYAN}Preparing data... Wait about 1 minute...${COLOR_CLEAR}"
+mkdir -p $dir
+../common/fastcp.py $hadoop_src $dir
+
+# git init and git add
+mkdir -p /mnt/git_dir
+echo -e "${COLOR_CYAN}Running git init and git add... Wait about 1 minute...${COLOR_CLEAR}"
+mount -t tmpfs -o size=1024M tmpfs /mnt/git_dir
+cd $M
+git init --separate-git-dir=/mnt/git_dir
+git add .
+cd -
+
+cset shield -k on -c 0
+
+# git status
+echo -e "${COLOR_CYAN}Running git status...${COLOR_CLEAR}"
+../common/clean.sh
+cd $M
+output=$(cset shield -e -- time -f "LATENCY: %e" bash -c "$git status > /dev/null" 2>&1)
+status_latency=$(echo "$output" | grep "LATENCY:" | awk "{ print \$2 }")
+echo -e "${COLOR_GREEN}git status latency: $status_latency s${COLOR_CLEAR}"
+cd -
+
+# git commit
+echo -e "${COLOR_CYAN}Running git commit...${COLOR_CLEAR}"
+../common/clean.sh
+cd $M
+output=$(cset shield -e -- time -f "LATENCY: %e" bash -c "$git commit -q -m \"123\" > /dev/null" 2>&1)
+commit_latency=$(echo "$output" | grep "LATENCY:" | awk "{ print \$2 }")
+echo -e "${COLOR_GREEN}git commit latency: $commit_latency s${COLOR_CLEAR}"
+cd -
+
+cset shield -r
+
+# write result
+# fsname status_latency commit_latency
+echo "$1 $status_latency $commit_latency" >> .data
+echo -e "${COLOR_MAGENTA}Done! Data saved in .data file.${COLOR_CLEAR}"
+
+# cleanup
+umount /mnt/git_dir
+rm -rf /mnt/git_dir
+
+fs_umount

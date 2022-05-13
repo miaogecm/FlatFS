@@ -1,0 +1,10 @@
+connect 'jdbc:derby:/home/flatfs/hive/metastore_db'; 
+
+call SQLJ.INSTALL_JAR('/home/flatfs/mo-fs/application/hive/commons-lang3-3.12.0/commons-lang3-3.12.0.jar', 'APP.commons_lang', 0);
+call SYSCS_UTIL.SYSCS_SET_DATABASE_PROPERTY('derby.database.classpath', 'APP.commons_lang');
+create function replace (sourceString varchar(8000), searchString varchar(8000), replaceString varchar(8000))
+returns varchar(8000)
+parameter style java no sql
+language java external name 'org.apache.commons.lang3.StringUtils.replace';
+
+update sds set LOCATION=replace(LOCATION, 'file:${SRC}', 'file:${DST}');

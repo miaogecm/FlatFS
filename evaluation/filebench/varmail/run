@@ -1,0 +1,28 @@
+#!/bin/bash
+
+. ../../common/color.sh
+
+nthread=1
+nfile=50000
+meandirwidths=(2 3 4 8 16)
+
+fs=$1
+
+. ../../common/fs/$fs.sh
+
+fs_mount
+path=$M/atc22/experiment/data/macrobenchmark/filebench/varmail
+fs_umount
+
+for meandirwidth in "${meandirwidths[@]}"; do
+    echo -e "${COLOR_CYAN}Test meandirwidth=$meandirwidth...${COLOR_CLEAR}"
+    fs_mount
+    ../helper/run_filebench $path varmail.f $nthread $nfile $meandirwidth
+    fs_umount
+    thruput=$(cat .thruput)
+    rm .thruput
+    echo -e "${COLOR_GREEN}Throughput for meandirwidth=$meandirwidth: $thruput${COLOR_CLEAR}"
+    echo "$1 $meandirwidth $thruput" >> .data
+done
+
+echo -e "${COLOR_MAGENTA}Done! Data saved in .data file.${COLOR_CLEAR}"

@@ -1,0 +1,40 @@
+#!/bin/bash
+
+. ../../common/color.sh
+
+fs=flatfs
+nfile_per_cpu=20000
+rep=10
+
+make -C ../helper/test clean
+make -C ../helper/test
+
+. ../../common/fs/$fs.sh
+
+for cold_cache in $(seq 0 1); do
+    for h in $(seq 2 5); do
+	fs_mount
+	
+	echo -e "${COLOR_CYAN}Preparing data for cold_cache=$cold_cache, height=$h... Wait a few seconds...${COLOR_CLEAR}"
+	../helper/mkfiles.py $M $((h - 1)) $nfile_per_cpu
+
+	cset shield -k on -c 0
+
+	for depth in $(seq 0 5); do
+	    latency=0
+	    for run in $(seq 1 $rep); do
+		output=$(cset shield -e -- ../helper/test/test $((h - 1)) $depth $cold_cache $M 1 | tee /dev/tty)
+		latency=$((latency + $(echo "$output" | grep "LATENCY:" | awk "{ print \$2 }")))
+	    done
+	    latency=$((latency / $rep))
+	    echo "Latency(depth=$depth): $latency ns"
+	    echo "$cold_cache $h $depth $latency" >> .data
+	done
+
+	cset shield -r
+	
+	fs_umount
+    done
+done
+
+echo -e "${COLOR_MAGENTA}Done! Data saved in .data file.${COLOR_CLEAR}"

@@ -1,0 +1,54 @@
+#!/bin/bash
+
+. ../common/color.sh
+
+rep=3
+nthreads=(1 2 4 8 16 24 32)
+
+export CPUSEQ=0,2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32,34,36,38,40,42,0,2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32,34,36,38,40,42,44,46,1,3,5,7,9,11,13,15,17,19,21,23,25,27,29,31,33,35,37,39,41,43,45,47
+
+fs=$1
+
+. ../common/fs/$fs.sh
+
+fs_mount
+
+dir=$M/atc22/experiment/data/application/psearchy/bio-data
+
+# prepare data
+echo -e "${COLOR_CYAN}Preparing data... Wait about 1 minute...${COLOR_CLEAR}"
+mkdir -p $dir
+cp psearchy/bio-data/datagen_big.py $dir
+cp psearchy/bio-data/tiny_data_big.txt $dir
+cp mkpath.py $dir
+cd $dir
+./datagen_big.py
+./mkpath.py $dir
+cd -
+
+# run tests
+for nthread in "${nthreads[@]}"; do
+    echo -e "${COLOR_CYAN}Testing $nthread threads...${COLOR_CLEAR}"
+    thruput=0
+    for run in $(seq 1 $rep); do
+	while true; do
+	    ./mkdir.sh $M
+	    ../common/clean.sh
+	    output=$(psearchy/mkdb/pedsort -t $M/db/ -c $nthread -m 16 -x $dir/.path | tee /dev/tty)
+	    rm -rf $M/db
+	    cur=$(echo "$output" | grep "total throughput" | awk "{ print(\$3); }")
+	    cur=$(python -c "print int($cur)")
+	    if [[ $cur == 0 ]]; then
+		continue
+	    fi
+	    echo "Throughput: $cur"
+	    thruput=$((thruput+cur))
+	    break
+	done
+    done
+    thruput=$((thruput / $rep))
+    echo -e "${COLOR_GREEN}Throughput for $nthread threads: $thruput${COLOR_CLEAR}"
+    echo "$1 $nthread $thruput" >> .data
+done
+
+fs_umount

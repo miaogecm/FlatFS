@@ -1,0 +1,58 @@
+#!/bin/bash
+
+. ../../common/color.sh
+
+nfile_per_cpu=20000
+rep=10
+testcases=("(3 2 1)" "(3 2 0)" "(4 2 1)" "(4 2 0)" "(5 2 1)" "(5 2 0)")
+
+make -C ../helper/test clean
+make -C ../helper/test
+
+if [[ $1 == vfs ]]; then
+    fs=tmpfs
+elif [[ $1 == flatfs ]]; then
+    fs=flatfs
+else
+    fs=$1
+fi
+
+. ../../common/fs/$fs.sh
+
+for testcase in "${testcases[@]}"; do
+    fs_mount
+
+    eval "k=$testcase"
+
+    h=${k[0]}
+    depth=${k[1]}
+    seq=${k[2]}
+	
+    echo -e "${COLOR_CYAN}Preparing data for height=$h... Wait a few seconds...${COLOR_CLEAR}"
+    ../helper/mkfiles.py $M $((h - 1)) $nfile_per_cpu
+
+    echo "Testing.."
+    cset shield -k on -c 0
+    latency=0
+    for run in $(seq 1 $rep); do
+	while true; do
+	    output=$(cset shield -e -- ../helper/test/test $((h - 1)) $depth 0 $M $seq | tee /dev/tty)
+	    cur=$(echo "$output" | grep "LATENCY:" | awk "{ print \$2 }")
+	    if [[ $cur -gt 10000 ]]; then
+		continue
+	    fi
+	    latency=$((latency + $cur))
+	    break
+	done
+    done
+    latency=$((latency / $rep))
+    cset shield -r
+    echo -e "${COLOR_GREEN}Latency(depth=$depth): $latency ns${COLOR_CLEAR}"
+
+    echo "$1 $h $depth $seq $latency" >> .data
+
+    fs_umount
+done
+
+echo -e "${COLOR_MAGENTA}Done! Data saved in .data file.${COLOR_CLEAR}"
+

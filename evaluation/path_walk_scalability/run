@@ -1,0 +1,64 @@
+#!/bin/bash
+
+. ../common/color.sh
+
+rep=10
+depth=50
+nrs=(1 10 20 30 40 50)
+latencies=()
+cold_cache=1
+
+if [[ $1 == nova_hot_dcache ]]; then
+    fs=nova
+    cold_cache=0
+else
+    fs=$1
+fi
+
+. ../common/fs/$fs.sh
+
+fs_mount
+
+# prepare data
+echo -e "${COLOR_CYAN}Preparing data...${COLOR_CLEAR}"
+dir_tree=$(seq 1 $depth | awk '{ printf("/" $1); }')
+mkdir -p $M$dir_tree
+echo Directory tree: $dir_tree
+for nr in "${nrs[@]}"; do
+    latencies[$nr]=0
+done
+
+cset shield -k on -c 0
+
+# run tests
+for nr in "${nrs[@]}"; do
+    echo -e "${COLOR_CYAN}Test latency for depth=$nr...${COLOR_CLEAR}"
+    path=$M$(seq 1 $nr | awk '{ printf("/" $1); }')
+    echo "Path: $path"
+    if [[ $cold_cache -eq 0 ]]; then
+	for run in $(seq 1 5); do
+	    # make it hot
+	    ../common/tools/path_walk $path > /dev/null
+	done
+    fi
+    for run in $(seq 1 $rep); do
+	if [[ $cold_cache -ne 0 ]]; then
+	    ../common/clean.sh
+	fi
+	output=$(cset shield -e -- ../common/tools/path_walk $path)
+	latency=$(echo "$output" | grep "LATENCY:" | awk "{ print \$2 }")
+	echo "Run $run: $latency us"
+	latencies[$nr]=$((latencies[$nr] + latency))
+    done
+    latencies[$nr]=$((latencies[$nr] / $rep))
+    echo -e "${COLOR_GREEN}latency for depth=$nr: ${latencies[$nr]} us${COLOR_CLEAR}"
+done
+
+cset shield -r
+
+# write result
+# fsname latency1 latency2 latency3 ...
+echo "$1 ${latencies[@]}" >> .data
+echo -e "${COLOR_MAGENTA}Done! Data saved in .data file.${COLOR_CLEAR}"
+
+fs_umount

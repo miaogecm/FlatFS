@@ -1,0 +1,28 @@
+Derived from a sequential version of searchy (Jinyang Li's search engine)
+
+mkdb.conf is as in searchy
+
+Create directories to store the per-core dbs and files.  You may want to mount store each directory on a separately mounted file system.
+
+   mkdir /tmp/db/db0
+   mkdir /tmp/db/db1
+   ....
+
+To build the indices using two cores (-c 2) with a 1024 MB hash table per core (-m 1024), run:
+
+   ./mkdb/pedsort -t /tmp/db/db -c 2 -m 1024 < files
+
+To run the process version instead of the threaded version run:
+
+   ./mkdb/pedsort -p -t /tmp/db/db -c 2 -m 1024 < files
+
+To run the process version and round-robin assign processes to sockets/core run:
+
+   ./mkdb/pedsort -p -t /tmp/db/db -c 2 -m 1024 -s 1 < files
+
+Files should contain a pathname for a file to be indexed per line.
+
+
+To query the indices:
+
+   ./query/qe -t /tmp/db/db -q "main" -c 2  -l

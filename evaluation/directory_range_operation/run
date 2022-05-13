@@ -1,0 +1,67 @@
+#!/bin/bash
+
+. ../common/color.sh
+
+# The dataset is linux-4.4 source code directory tree which is
+# located in /home/flatfs/Desktop/linux-4.4.
+# If you run this experiment on your machine, download the
+# source code directory tree, and modify following $linux_src.
+linux_src=/home/flatfs/Desktop/linux-4.4
+
+fs=$1
+
+. ../common/fs/$fs.sh
+
+fs_mount
+
+# prepare data
+echo -e "${COLOR_CYAN}Preparing data... Wait about 1 minute...${COLOR_CLEAR}"
+mkdir -p $M/linux
+cp -r $linux_src/* $M/linux
+
+cset shield -k on -c 0
+
+# readdir
+echo -e "${COLOR_CYAN}Test readdir...${COLOR_CLEAR}"
+if [[ $1 == flatfs ]]; then
+    output=$(cset shield -e -- bash -c "TIMEFORMAT=\"LATENCY: %R\"; time readdir-recur $M/linux > /dev/null" 2>&1)
+else
+    output=$(cset shield -e -- bash -c "TIMEFORMAT=\"LATENCY: %R\"; time ls -R $M/linux > /dev/null" 2>&1)
+fi
+readdir_latency=$(echo "$output" | grep "LATENCY:" | awk "{ print \$2 }")
+echo -e "${COLOR_GREEN}latency in readdir: $readdir_latency us${COLOR_CLEAR}"
+
+# cpdir
+echo -e "${COLOR_CYAN}Test cpdir...${COLOR_CLEAR}"
+if [[ $1 == flatfs ]]; then
+    output=$(cset shield -e -- bash -c "TIMEFORMAT=\"LATENCY: %R\"; time cpdir-recur $M/linux $M/linux1" 2>&1)
+else
+    output=$(cset shield -e -- bash -c "TIMEFORMAT=\"LATENCY: %R\"; time cp -r $M/linux $M/linux1" 2>&1)
+fi
+cpdir_latency=$(echo "$output" | grep "LATENCY:" | awk "{ print \$2 }")
+echo -e "${COLOR_GREEN}latency in cpdir: $cpdir_latency us${COLOR_CLEAR}"
+
+# mvdir
+echo -e "${COLOR_CYAN}Test mvdir...${COLOR_CLEAR}"
+output=$(cset shield -e -- bash -c "TIMEFORMAT=\"LATENCY: %R\"; time mv $M/linux1 $M/linux2" 2>&1)
+mvdir_latency=$(echo "$output" | grep "LATENCY:" | awk "{ print \$2 }")
+echo -e "${COLOR_GREEN}latency in mvdir: $mvdir_latency us${COLOR_CLEAR}"
+
+# rmdir
+echo -e "${COLOR_CYAN}Test rmdir...${COLOR_CLEAR}"
+if [[ $1 == flatfs ]]; then
+    output=$(cset shield -e -- bash -c "TIMEFORMAT=\"LATENCY: %R\"; time rmdir-recur $M/linux" 2>&1)
+else
+    output=$(cset shield -e -- bash -c "TIMEFORMAT=\"LATENCY: %R\"; time rm -rf $M/linux" 2>&1)
+fi
+rmdir_latency=$(echo "$output" | grep "LATENCY:" | awk "{ print \$2 }")
+echo -e "${COLOR_GREEN}latency in rmdir: $rmdir_latency us${COLOR_CLEAR}"
+
+cset shield -r
+
+# write result
+# fsname readdir_latency rmdir_latency cpdir_latency mvdir_latency
+echo "$1 $readdir_latency $rmdir_latency $cpdir_latency $mvdir_latency" >> .data
+echo -e "${COLOR_MAGENTA}Done! Data saved in .data file.${COLOR_CLEAR}"
+
+fs_umount

@@ -1,0 +1,8 @@
+### EasyConnect Install
+
+We provide three clients in `evaluation/vpn/` for Windows 10, Ubuntu 18.04, and MacOS systems.
+
++ If you use a Windows 10 system, install the `EasyConnectInstaller.exe` into your system.
+
++ If you use a Ubuntu 18.04 system, run `sudo dpkg -i EasyConnect_x64_7_6_7_3.deb` to install the VPN client. If there are problems during install, decompress `libpango for easyconnect.tar.xz` and copy `libpango-1.0.so.0`, `libpangocairo-1.0.so.0`, `libpangoft2-1.0.so.0` to `/usr/share/sangfor/EasyConnect`.
++ If you use a MacOS system, please install `EasyConnect_7_6_7_4.dmg` into your system. 

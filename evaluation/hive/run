@@ -1,0 +1,37 @@
+#!/bin/bash
+
+. ../common/color.sh
+
+rep=3
+
+fs=$1
+
+. ../common/fs/$fs.sh
+
+fs_mount
+
+table=$M/atc2022/experiment/data/application/hive/table
+
+# prepare data
+echo -e "${COLOR_CYAN}Preparing data... Wait about 1 minute...${COLOR_CLEAR}"
+mkdir -p $table
+../common/fastcp.py ${TBL_PATH} $table
+cat tbl_mv.ij | sed -e "s|\${SRC}|$TBL_PATH|g" -e "s|\${DST}|$table|g" > .tbl_mv.ij
+ij < .tbl_mv.ij
+
+# run
+echo -e "${COLOR_CYAN}Running ... Wait about 1 minute...${COLOR_CLEAR}"
+latency=0
+for run in $(seq 1 $rep); do
+    ../common/cset_on.sh
+    ../common/clean.sh
+    output=$(cset shield -e -- hive -f tbl_run.hive 2>&1 | tee /dev/tty)
+    cur=$(echo "$output" | grep "Time taken:" | tail -1 | awk "{ print(\$3) }")
+    latency=$(python -c "print $latency + $cur")
+    ../common/cset_off.sh
+done
+latency=$(python -c "print round($latency / $rep, 3)")
+echo -e "${COLOR_GREEN}Latency: $latency${COLOR_CLEAR}"
+echo "$1 $latency" >> .data
+
+fs_umount

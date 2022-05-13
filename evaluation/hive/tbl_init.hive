@@ -1,0 +1,102 @@
+drop database tpch cascade;
+create database tpch;
+use tpch;
+set mapred.reduce.tasks = 48;
+set mapred.map.tasks = 48;
+set mapred.min.split.size=536870912;
+set hive.exec.dynamic.partition.mode=nonstrict ;
+set hive.exec.max.dynamic.partitions.pernode=10000000;
+set hive.exec.reducers.bytes.per.reducer=256000000;
+set hive.exec.max.created.files=1000000;
+set hive.groupby.skewindata=true;
+set hive.exec.max.dynamic.partitions=10000000;
+set hive.fetch.task.conversion=more;
+set hive.strict.checks.cartesian.product=flase;
+set hive.mapred.mode=nonstrict;
+set hive.exec.parallel=true;
+set hive.exec.parallel.thread.number=48;
+set mapreduce.job.ubertask.enable=true;
+set hive.exec.mode.local.auto=true;
+set hive.auto.convert.join=true
+set hive.vectorized.execution.enabled = true;
+set hive.typecheck.on.insert=false;
+set hive.exec.mode.local.auto.input.files.max=1000000;
+set hive.exec.mode.local.auto.inputbytes.max=1000000000;
+set mapred.job.reuse.jvm.num.tasks=10;
+set hive.optimize.index.filter=true;
+set hive.exec.orc.skip.corrupt.data=true;
+set hive.optimize.sort.dynamic.partition=true;
+set mapreduce.map.speculative=true;
+set lineitem_path = "./tpc-h/dbgen/lineitem.tbl";
+--1--lineitem-----------
+drop table lineitem;
+drop table lineitem_1;
+create table lineitem_1 (
+  l_orderkey int,
+  l_partkey int,
+  l_suppkey int,
+  l_linenumber int,
+  l_quantity double,
+  l_extendedprice double,
+  l_discount double,
+  l_tax double,
+  l_returnflag string,
+  l_linestatus string,
+  l_shipdate string,
+  l_commitdate string,
+  l_receiptdate string,
+  l_shipinstruct string,
+  l_shipmode string,
+  l_comment string)
+row format delimited
+fields terminated by '|'
+stored as textfile;
+load data local inpath ${hiveconf:lineitem_path} into table tpch.lineitem_1;
+create table lineitem (l_suppkey int,l_orderkey int,l_extendedprice double,l_comment string,  l_linenumber int)
+partitioned by(
+  l_receiptdate string,
+  l_shipdate string,
+  l_commitdate string,
+  l_partkey int,
+  l_quantity double,
+  l_discount double,
+  l_tax double,
+  l_shipmode string,
+  l_shipinstruct string,
+  l_returnflag string,
+  l_linestatus string
+)
+location '${TBL_PATH}';
+INSERT OVERWRITE TABLE lineitem partition
+(
+  l_receiptdate,
+  l_shipdate,
+  l_commitdate,
+  l_partkey,
+  l_quantity,
+  l_discount,
+  l_tax,
+  l_shipmode,
+  l_shipinstruct,
+  l_returnflag,
+  l_linestatus
+ )
+select l_suppkey ,
+  l_orderkey ,
+  l_extendedprice ,
+  l_comment ,
+  l_linenumber ,
+
+  l_receiptdate,
+  l_shipdate,
+  l_commitdate,
+  l_partkey,
+  l_quantity,
+  l_discount,
+  l_tax,
+  l_shipmode,
+  l_shipinstruct,
+  l_returnflag,
+  l_linestatus
+from lineitem_1
+DISTRIBUTE BY rand();

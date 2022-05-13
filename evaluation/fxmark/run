@@ -1,0 +1,50 @@
+#!/bin/bash
+
+. ../common/color.sh
+
+rep=3
+mwcm_duration=10
+mwum_duration=10
+nthread=24
+
+fs=$1
+
+. ../common/fs/$fs.sh
+
+../common/cset_on.sh
+
+echo -e "${COLOR_CYAN}Testing MWCM...${COLOR_CLEAR}"
+thruput=0
+for run in $(seq 1 $rep); do
+    echo -e "${COLOR_CYAN}Run #$run${COLOR_CLEAR}"
+    fs_mount
+    ../common/clean.sh
+    mkdir $M/test
+    output=$(cset shield -e -- fxmark/bin/fxmark --type MWCM --duration $mwcm_duration --ncore $nthread --nbg 1 --root $M/test | tee /dev/tty)
+    thruput=$((thruput+$(echo "$output" | awk "/works/{getline; print int(\$4)}")))
+    fs_umount
+done
+thruput=$((thruput / $rep))
+echo -e "${COLOR_GREEN}MWCM Throughput: $thruput${COLOR_CLEAR}"
+mwcm_thruput=$thruput
+
+echo -e "${COLOR_CYAN}Testing MWUM...${COLOR_CLEAR}"
+thruput=0
+for run in $(seq 1 $rep); do
+    echo -e "${COLOR_CYAN}Run #$run${COLOR_CLEAR}"
+    fs_mount
+    ../common/clean.sh
+    mkdir $M/test
+    output=$(cset shield -e -- fxmark/bin/fxmark --type MWUM --duration $mwum_duration --ncore $nthread --nbg 1 --root $M/test | tee /dev/tty)
+    thruput=$((thruput+$(echo "$output" | awk "/works/{getline; print int(\$4)}")))
+    fs_umount
+done
+thruput=$((thruput / $rep))
+echo -e "${COLOR_GREEN}MWUM Throughput: $thruput${COLOR_CLEAR}"
+mwum_thruput=$thruput
+
+../common/cset_off.sh
+
+# write result
+echo "$1 $mwcm_thruput $mwum_thruput" >> .data
+echo -e "${COLOR_MAGENTA}Done! Data saved in .data file.${COLOR_CLEAR}"

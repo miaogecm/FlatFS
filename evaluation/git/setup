@@ -1,0 +1,13 @@
+#!/bin/bash
+
+pushd git-opt
+echo "Building git-opt..."
+make -j
+ln -s $(pwd)/git /usr/local/bin/git_opt
+popd
+
+pushd git-slient
+echo "Building git-slient..."
+make -j
+ln -s $(pwd)/git /usr/local/bin/git_slient
+popd

@@ -1,0 +1,133 @@
+#!/bin/bash
+
+. ../common/color.sh
+
+rep=10
+# The the dataset is linux-4.4 source code directory tree which is
+# located in /home/flatfs/Desktop/linux-4.4.
+# If you run this experiment on your machine, download the
+# source code directory tree, and modify following $linux_src.
+linux_src=/home/flatfs/Desktop/linux-4.4
+
+if [[ $1 == dcache ]]; then
+    fs=vfs_opt
+    mntdev=/dev/ram1
+    dax=""
+else
+    fs=$1
+    mntdev=/dev/pmem14
+    dax="-o dax"
+fi
+
+. ../common/fs/$fs.sh
+
+fs_mount
+
+pre=$M/atc22/experiment/data/microbenchmark
+
+# prepare data
+echo -e "${COLOR_CYAN}Preparing data... Wait about 1 minutes...${COLOR_CLEAR}"
+mkdir -p $pre/linux/linux-4.4
+cp -r $linux_src/* $pre/linux/linux-4.4
+mkdir -p $pre/testdotdot
+ln -s $pre/linux $pre/link
+mkdir -p $pre/mntpoint/ext4
+
+cset shield -k on -c 0
+
+# test cold dcache case
+echo -e "${COLOR_CYAN}Test cold dcache case...${COLOR_CLEAR}"
+cold_latency=0
+for run in $(seq 1 $rep); do
+    ../common/clean.sh
+    output=$(cset shield -e -- ../common/tools/path_walk $pre/linux/linux-4.4/fs/ext4/super.c)
+    latency=$(echo "$output" | grep "LATENCY:" | awk "{ print \$2 }")
+    echo "Run $run: $latency us"
+    cold_latency=$((cold_latency + latency))
+done
+cold_latency=$((cold_latency / $rep))
+echo -e "${COLOR_GREEN}latency in cold dcache: $cold_latency us${COLOR_CLEAR}"
+
+# test hot dcache case
+echo -e "${COLOR_CYAN}Test hot dcache case...${COLOR_CLEAR}"
+hot_latency=0
+for run in $(seq 1 5); do
+    # make it hot
+    ../common/tools/path_walk $pre/linux/linux-4.4/fs/ext4/super.c > /dev/null
+done
+for run in $(seq 1 $rep); do
+    output=$(cset shield -e -- ../common/tools/path_walk $pre/linux/linux-4.4/fs/ext4/super.c)
+    latency=$(echo "$output" | grep "LATENCY:" | awk "{ print \$2 }")
+    echo "Run $run: $latency us"
+    hot_latency=$((hot_latency + latency))
+done
+hot_latency=$((hot_latency / $rep))
+echo -e "${COLOR_GREEN}latency in hot dcache: $hot_latency us${COLOR_CLEAR}"
+
+# test dotdot case
+echo -e "${COLOR_CYAN}Test dotdot case...${COLOR_CLEAR}"
+dotdot_latency=0
+for run in $(seq 1 $rep); do
+    ../common/clean.sh
+    output=$(cset shield -e -- ../common/tools/path_walk $pre/testdotdot/../linux/linux-4.4/fs/ext4/super.c)
+    latency=$(echo "$output" | grep "LATENCY:" | awk "{ print \$2 }")
+    echo "Run $run: $latency us"
+    dotdot_latency=$((dotdot_latency + latency))
+done
+dotdot_latency=$((dotdot_latency / $rep))
+echo -e "${COLOR_GREEN}latency in dotdot: $dotdot_latency us${COLOR_CLEAR}"
+
+# test dot case
+echo -e "${COLOR_CYAN}Test dot case...${COLOR_CLEAR}"
+dot_latency=0
+for run in $(seq 1 $rep); do
+    ../common/clean.sh
+    output=$(cset shield -e -- ../common/tools/path_walk $pre/./linux/linux-4.4/fs/ext4/super.c)
+    latency=$(echo "$output" | grep "LATENCY:" | awk "{ print \$2 }")
+    echo "Run $run: $latency us"
+    dot_latency=$((dot_latency + latency))
+done
+dot_latency=$((dot_latency / $rep))
+echo -e "${COLOR_GREEN}latency in dot: $dot_latency us${COLOR_CLEAR}"
+
+# test symlink case
+echo -e "${COLOR_CYAN}Test symlink case...${COLOR_CLEAR}"
+symlink_latency=0
+for run in $(seq 1 $rep); do
+    ../common/clean.sh
+    output=$(cset shield -e -- ../common/tools/path_walk $pre/link/linux-4.4/fs/ext4/super.c)
+    latency=$(echo "$output" | grep "LATENCY:" | awk "{ print \$2 }")
+    echo "Run $run: $latency us"
+    symlink_latency=$((symlink_latency + latency))
+done
+symlink_latency=$((symlink_latency / $rep))
+echo -e "${COLOR_GREEN}latency in symlink: $symlink_latency us${COLOR_CLEAR}"
+
+# test mntpoint case
+mkfs.ext4 $mntdev
+mount -t ext4 $dax $mntdev $pre/mntpoint/ext4
+mkdir $pre/mntpoint/ext4/dir
+touch $pre/mntpoint/ext4/dir/test
+echo -e "${COLOR_CYAN}Test mntpoint case...${COLOR_CLEAR}"
+mntpoint_latency=0
+for run in $(seq 1 $rep); do
+    if [[ $1 -ne "dcache" ]]; then
+	../common/clean.sh
+    fi
+    output=$(cset shield -e -- ../common/tools/path_walk $pre/mntpoint/ext4/dir/test)
+    latency=$(echo "$output" | grep "LATENCY:" | awk "{ print \$2 }")
+    echo "Run $run: $latency us"
+    mntpoint_latency=$((mntpoint_latency + latency))
+done
+mntpoint_latency=$((mntpoint_latency / $rep))
+echo -e "${COLOR_GREEN}latency in mntpoint: $mntpoint_latency us${COLOR_CLEAR}"
+umount $pre/mntpoint/ext4
+
+cset shield -r
+
+# write result
+# fsname cold_latency hot_latency dotdot_latency dot_latency symlink_latency mntpoint_latency
+echo "$1 $cold_latency $hot_latency $dotdot_latency $dot_latency $symlink_latency $mntpoint_latency" >> .data
+echo -e "${COLOR_MAGENTA}Done! Data saved in .data file.${COLOR_CLEAR}"
+
+fs_umount

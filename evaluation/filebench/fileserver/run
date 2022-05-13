@@ -1,0 +1,28 @@
+#!/bin/bash
+
+. ../../common/color.sh
+
+nthreads=(1 8 16 24 32 40 48)
+nfile=100000
+meandirwidth=2
+
+fs=$1
+
+. ../../common/fs/$fs.sh
+
+fs_mount
+path=$M/atc22/experiment/data/macrobenchmark/filebench/fileserver
+fs_umount
+
+for nthread in "${nthreads[@]}"; do
+    echo -e "${COLOR_CYAN}Test $nthread threads...${COLOR_CLEAR}"
+    fs_mount
+    ../helper/run_filebench $path fileserver.f $nthread $nfile $meandirwidth
+    fs_umount
+    thruput=$(cat .thruput)
+    rm .thruput
+    echo -e "${COLOR_GREEN}Throughput for $nthread threads: $thruput${COLOR_CLEAR}"
+    echo "$1 $nthread $thruput" >> .data
+done
+
+echo -e "${COLOR_MAGENTA}Done! Data saved in .data file.${COLOR_CLEAR}"
