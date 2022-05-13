@@ -40,7 +40,7 @@ Security options/TOMOYO Linux support
 Security options/Security hooks for pathname based access control
 ```
 
-configure CPU number `FLATFS_NCPU` in `linux-4.15/include/linux/flatfs_define.h`
+configure `FLATFS_NCPU` in `linux-4.15/include/linux/flatfs_define.h` as maximum CPU number in your system.
 
 Compile the kernel: `make -j`
 
