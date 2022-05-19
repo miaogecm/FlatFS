@@ -1503,6 +1503,119 @@ void flatfs_d_set_umounted(struct dentry *dentry) {
     FLATFS_INFO(VFS_MOUNT, "fentry %lx (%.*s) umounted", (unsigned long) fe, FASTR_FMT(fe->d_fullpath));
 }
 
+int use_range_rename_batch = 1;
+
+static void range_rename_point(struct super_block *sb,
+                               brt_tree_t *old_tree, brt_tree_t *new_tree,
+                               struct fentry *old_fe, struct fentry *new_fe) {
+    struct changelist {
+        fastr_t from_path, to_path;
+        ppcs_t to_ppcs;
+        struct list_head list;
+    };
+
+    fastr_t old_path = old_fe->d_fullpath, new_path = new_fe->d_fullpath;
+    DEFINE_BRT_QR(qr, BRT_QR_RAW);
+    struct changelist *p, *tmp;
+    LIST_HEAD(changelist);
+    fastr_t left, right;
+    brt_it_t it;
+    int err;
+
+    left = dir_min_key(old_path);
+    right = dir_max_key(old_path);
+
+    brt_lobnd(old_tree, &it, left);
+    while (!(err = brt_it_next(&it, &qr)) && fastr_strcmp(qr.path, right) <= 0) {
+        struct changelist *r = kmalloc(sizeof(*r), GFP_ATOMIC);
+        ppcs_t ppcs;
+        void *buf;
+
+        r->from_path = fastr(kmalloc(qr.path.len, GFP_ATOMIC), 0);
+        flatfs_namespace_lookup(old_tree, r->from_path, &ppcs, NULL, 0);
+        fastr_append(&r->from_path, qr.path);
+        INIT_LIST_HEAD(&r->list);
+        buf = ppcs.chars;
+
+        r->to_path = fastr(kmalloc(qr.path.len - old_path.len + new_path.len, GFP_ATOMIC), 0);
+        fastr_append(&r->to_path, new_path);
+        fastr_append(&r->to_path, fastr_slice_after(qr.path, old_path.len));
+
+        ppcs_shrink_pre(&ppcs, old_fe->d_depth);
+        r->to_ppcs = ppcs_from_narr(kmalloc(new_fe->d_ppcs.len + ppcs.len, GFP_ATOMIC), 0);
+        ppcs_append(&r->to_ppcs, new_fe->d_ppcs, 0, new_fe->d_depth);
+        ppcs_append(&r->to_ppcs, ppcs, 0, ppcs_depth(ppcs));
+
+        kfree(buf);
+
+        FLATFS_INFO(FS_RENAME, "change from %.*s to %.*s", FASTR_FMT(r->from_path), FASTR_FMT(r->to_path));
+    }
+    BUG_ON(err);
+    brt_it_close(&it);
+
+    list_for_each_entry_safe(p, tmp, &changelist, list) {
+        flatfs_namespace_insert(new_tree, p->to_path, qr.inode, p->to_ppcs, 0);
+        flatfs_namespace_remove(new_tree, p->from_path);
+
+        list_del(&p->list);
+        kfree(p->to_ppcs.chars);
+        kfree(p->to_path.chars);
+        kfree(p->from_path.chars);
+        kfree(p);
+    }
+}
+
+static void range_rename_batch(struct super_block *sb,
+                               brt_tree_t *old_tree, brt_tree_t *new_tree,
+                               struct fentry *old_fe, struct fentry *new_fe) {
+    fastr_t old_path = old_fe->d_fullpath, new_path = new_fe->d_fullpath;
+    ppcs_t new_dir_ppc = new_fe->d_ppcs;
+    void *dst_pppc_buffer;
+    fastr_t left, right;
+    brt_tree_t subtree;
+    ppcs_t dst_pppc;
+
+    subtree = flatfs_get_tree(sb);
+    left = dir_min_key_outer(old_path);
+    right = dir_max_key_outer(old_path);
+    range_remove(sb, &subtree, old_tree, left, right);
+    kfree(left.chars);
+    kfree(right.chars);
+
+    FLATFS_INFO(FS_RENAME, "bplus_tree_remove_range: %.*s\n", FASTR_FMT(old_path));
+
+    dst_pppc_buffer = kmalloc(new_dir_ppc.len, GFP_ATOMIC);
+    dst_pppc = ppcs_from_narr(dst_pppc_buffer, 0);
+    ppcs_append(&dst_pppc, new_dir_ppc, 0, ppcs_depth(new_dir_ppc));
+
+    brt_chgpre(&subtree, &(brt_chgpre_opt_t) {
+        .src = old_path,
+        .dst = new_path,
+        .pppcs = dst_pppc,
+        .pppc = ino2pppc(old_fe->d_inode)
+    });
+
+    kfree(dst_pppc_buffer);
+
+    FLATFS_INFO(FS_RENAME, "bplus_tree_update_range: %.*s --> %.*s", FASTR_FMT(old_path), FASTR_FMT(new_path));
+
+    range_insert(sb, new_tree, &subtree);
+
+    flatfs_put_tree(&subtree);
+
+    FLATFS_INFO(FS_RENAME, "bplus_tree_insert_range: %.*s", FASTR_FMT(new_path));
+}
+
+static void range_rename(struct super_block *sb,
+                         brt_tree_t *old_tree, brt_tree_t *new_tree,
+                         struct fentry *old_fe, struct fentry *new_fe) {
+    if (use_range_rename_batch) {
+        range_rename_batch(sb, old_tree, new_tree, old_fe, new_fe);
+    } else {
+        range_rename_point(sb, old_tree, new_tree, old_fe, new_fe);
+    }
+}
+
 static int flatfs_rename(struct inode *old_dir, struct dentry *old_dentry,
                          struct inode *new_dir, struct dentry *new_dentry,
 			             unsigned int flags)
@@ -1513,7 +1626,7 @@ static int flatfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 	flatfs_transaction_t *trans;
 	struct super_block *sb = old_dir->i_sb;
 	struct flatfs_inode *pi, *new_pidir, *old_pidir;
-	brt_tree_t *old_tree, *new_tree, subtree;
+	brt_tree_t *old_tree, *new_tree;
 	int err = -ENOENT;
     fastr_t old_path = old_fe->d_fullpath, new_path = new_fe->d_fullpath;
     ppcs_t new_dir_ppc = new_fe->d_ppcs;
@@ -1608,10 +1721,6 @@ static int flatfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 			FLATFS_INFO(FS_RENAME, "bplus_tree_insert: %.*s inode[%lu]", FASTR_FMT(new_path), old_inode->i_ino);
 		}
 	} else { /* 2. rename a directory */
-	    fastr_t left, right;
-        void *dst_pppc_buffer;
-        ppcs_t dst_pppc;
-
 		flatfs_add_logentry(sb, trans, new_pidir, MAX_DATA_PER_LENTRY, LE_DATA);
 		/*new_dir->i_version++; */
 		new_dir->i_ctime = new_dir->i_mtime = current_time(new_dir);
@@ -1661,37 +1770,7 @@ static int flatfs_rename(struct inode *old_dir, struct dentry *old_dentry,
         FLATFS_INFO(FS_RENAME, "bplus_tree_insert: %.*s -> %lu",
                     FASTR_FMT(new_path), old_inode->i_ino >> FLATFS_INODE_BITS);
 
-        subtree = flatfs_get_tree(sb);
-        left = dir_min_key_outer(old_path);
-        right = dir_max_key_outer(old_path);
-        range_remove(sb, &subtree, old_tree, left, right);
-        kfree(left.chars);
-        kfree(right.chars);
-
-#ifdef CONFIG_FLATFS_DEBUG
-		printk("bplus_tree_remove_range: %.*s\n", FASTR_FMT(old_path));
-#endif
-
-        dst_pppc_buffer = kmalloc(new_dir_ppc.len, GFP_ATOMIC);
-        dst_pppc = ppcs_from_narr(dst_pppc_buffer, 0);
-        ppcs_append(&dst_pppc, new_dir_ppc, 0, ppcs_depth(new_dir_ppc));
-
-        brt_chgpre(&subtree, &(brt_chgpre_opt_t) {
-            .src = old_path,
-            .dst = new_path,
-            .pppcs = dst_pppc,
-            .pppc = ino2pppc(old_inode)
-        });
-
-        kfree(dst_pppc_buffer);
-
-		FLATFS_INFO(FS_RENAME, "bplus_tree_update_range: %.*s --> %.*s", FASTR_FMT(old_path), FASTR_FMT(new_path));
-
-		range_insert(sb, new_tree, &subtree);
-
-        flatfs_put_tree(&subtree);
-
-		FLATFS_INFO(FS_RENAME, "bplus_tree_insert_range: %.*s", FASTR_FMT(new_path));
+        range_rename(sb, old_tree, new_tree, old_fe, new_fe);
 	}
 
 	return 0;

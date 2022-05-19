@@ -12,6 +12,10 @@ make -C ../helper/test
 . ../../common/fs/$fs.sh
 
 for cold_cache in $(seq 0 1); do
+    if [[ $cold_cache == 1 ]]; then
+	echo 0 > /proc/sys/fs/ndcache-enable
+    fi
+    
     for h in $(seq 2 5); do
 	fs_mount
 	
@@ -23,8 +27,15 @@ for cold_cache in $(seq 0 1); do
 	for depth in $(seq 0 5); do
 	    latency=0
 	    for run in $(seq 1 $rep); do
-		output=$(cset shield -e -- ../helper/test/test $((h - 1)) $depth $cold_cache $M 1 | tee /dev/tty)
-		latency=$((latency + $(echo "$output" | grep "LATENCY:" | awk "{ print \$2 }")))
+		while true; do
+		    output=$(cset shield -e -- ../helper/test/test $((h - 1)) $depth $cold_cache $M 1 | tee /dev/tty)
+		    cur=$(echo "$output" | grep "LATENCY:" | awk "{ print \$2 }")
+		    if [[ $cur -gt 1000000 ]]; then
+			continue
+		    fi
+		    latency=$((latency + $cur))
+		    break
+		done
 	    done
 	    latency=$((latency / $rep))
 	    echo "Latency(depth=$depth): $latency ns"
@@ -35,6 +46,10 @@ for cold_cache in $(seq 0 1); do
 	
 	fs_umount
     done
+    
+    if [[ $cold_cache == 1 ]]; then
+	echo 1 > /proc/sys/fs/ndcache-enable
+    fi
 done
 
 echo -e "${COLOR_MAGENTA}Done! Data saved in .data file.${COLOR_CLEAR}"

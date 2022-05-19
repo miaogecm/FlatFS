@@ -1658,6 +1658,10 @@ static struct ctl_table vm_table[] = {
 	{ }
 };
 
+extern int ndcache_enable;
+extern int use_range_rename_batch;
+extern int use_woc_key;
+
 static struct ctl_table fs_table[] = {
 	{
 		.procname	= "inode-nr",
@@ -1847,9 +1851,30 @@ static struct ctl_table fs_table[] = {
     {
         .procname   = "show-path-walk",
         .data       = &show_path_walk,
-        .maxlen     = sizeof(int),
+        .maxlen     = sizeof(show_path_walk),
         .mode       = 0644,
         .proc_handler   = proc_dointvec_minmax
+    },
+    {
+        .procname	= "ndcache-enable",
+        .data       = &ndcache_enable,
+        .maxlen     = sizeof(ndcache_enable),
+        .mode		= 0644,
+        .proc_handler	= proc_dointvec,
+    },
+    {
+        .procname	= "use-range-rename-batch",
+        .data       = &use_range_rename_batch,
+        .maxlen     = sizeof(use_range_rename_batch),
+        .mode		= 0644,
+        .proc_handler	= proc_dointvec,
+    },
+    {
+        .procname	= "use-woc-key",
+        .data       = &use_woc_key,
+        .maxlen     = sizeof(use_woc_key),
+        .mode		= 0644,
+        .proc_handler	= proc_dointvec,
     },
 	{ }
 };

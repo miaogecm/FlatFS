@@ -38,7 +38,7 @@ for testcase in "${testcases[@]}"; do
 	while true; do
 	    output=$(cset shield -e -- ../helper/test/test $((h - 1)) $depth 0 $M $seq | tee /dev/tty)
 	    cur=$(echo "$output" | grep "LATENCY:" | awk "{ print \$2 }")
-	    if [[ $cur -gt 10000 ]]; then
+	    if [[ $cur -gt 1000000 ]]; then
 		continue
 	    fi
 	    latency=$((latency + $cur))

@@ -521,6 +521,8 @@ static void validate_ent_suf_cache(brt_tree_t *tree,
     }
 }
 
+int use_woc_key = 1;
+
 /*
  * prepend @path_addend to ent suffix
  *
@@ -560,6 +562,12 @@ static int ent_suf_prepend(brt_tree_t *tree,
 
     size_t old_dep, new_dep, perm_suf_dep, perm_dep;
     ppcs_t perm_cached;
+
+    if (unlikely(!use_woc_key)) {
+        char *prepend = brt_nd_path_suf(tree, src, ent).chars - path_addend.len;
+        memcpy(prepend, path_addend.chars, path_addend.len);
+        flatfs_flush_buffer(prepend, path_addend.len, 1);
+    }
 
     /* Can we use the suffix cache directly? */
     required_suf_len = path_suf_len + path_addend.len;
@@ -1466,6 +1474,8 @@ static inline void tree_walk_cache(brt_tree_t *tree, brt_node_t *node) {
     }
 }
 
+int ndcache_enable = 1;
+
 static int tree_walk_fastpath(brt_tree_t *tree, brt_key_t key,
                               brt_node_t **dnode, u8 *dpos, int *dne,
                               int wlock, u8 lbnd, u8 ubnd) {
@@ -1473,6 +1483,10 @@ static int tree_walk_fastpath(brt_tree_t *tree, brt_key_t key,
     struct ndcache_entry *entry;
     brt_node_t *node;
     u8 pos, nkeys;
+
+    if (unlikely(!ndcache_enable)) {
+        goto out;
+    }
 
     if (unlikely(!tree->ndc)) {
         goto out;
