@@ -77,17 +77,19 @@ All experiments are conducted on a Dell PowerEdge R740 server machine. Following
 
 #### 2. Software configuration
 
-**OS:** Ubuntu 14.04.6. Because BetrFS and VFS-opt only works on Linux 3.11.10 and 3.14, these old kernels do not support new Ubuntu releases. For a fair comparison, we use Ubuntu 14.04.6 for all file systems in the experiment.
+**OS:** Ubuntu 14.04.6. 
 
 **Ext4, XFS, PMFS, NOVA, FlatFS:** These file systems are implemented in Linux kernel 4.15.
 
 #### 3. How to access
 
+**VPN:** You should use a VPN client to access the machine. `evaluation/vpn/README` provides VPN connection instructions.
+
 Make sure there is one person running experiments at a time on our machine because performance interferences significantly impacts the results.
 
 #### 4. Environment Setup
 
-We already set up the environment properly in our machine. If you want to build these file systems by yourself, please follow instructions in section 4.1-4.4 and setup Hive in section 4.5. If you just want to reproduce the experiment results, please skip to section 5.
+We already set up the environment properly in our machine. If you want to build these file systems by yourself, please follow instructions in section 4.1-4.2 and setup Hive in section 4.3. If you just want to reproduce the experiment results, please skip to section 5.
 
 ##### 4.1 Update Grub
 
