@@ -229,6 +229,8 @@ Run `./plot.py` to draw the table.
 
 Change current directory into `evaluation/git`.
 
+Run `./setup` to prepare the data.
+
 Run `./clean` to clean old data.
 
 Run `./run $FS` to collect data for each file system, `$FS={ext4,xfs,pmfs,nova,flatfs,betrfs,vfs_opt,flatfs_opt}`.
