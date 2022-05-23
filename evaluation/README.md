@@ -211,7 +211,7 @@ Change current directory into `evaluation/psearchy`.
 
 Run `./clean` to clean old data.
 
-Run `./run $FS` to collect data for each file system, `$FS={ext4,xfs,pmfs,nova,flatfs,betrfs,vfs_opt}`.
+Run `./run $FS` to collect data for each file system, `$FS={ext4,xfs,pmfs,nova,flatfs}`.
 
 Run `./plot.py` to draw the figure.
 
