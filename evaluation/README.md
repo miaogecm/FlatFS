@@ -249,10 +249,12 @@ Run `./plot.py` to draw the figure.
 
 ##### 5.10 Reproducing Table 5
 
-Run `./clean` to clean old data.
-
 Change current directory `evaluation/hive`.
 
-Run `./run $FS` to collect data for each file system, `$FS={ext4,xfs,pmfs,nova,flatfs,betrfs,vfs_opt}`.
+Run `export TBL_PATH=~/hive/table` and `./mktable` to make tables.
+
+Run `./clean` to clean old data.
+
+Run `./run $FS` to collect data for each file system, `$FS={ext4,xfs,pmfs,nova,flatfs,betrfs,vfs_opt}`. You may encounter error messages like `ij> ERROR X0Y32: Jar file 'COMMONS_LANG' already exists in Schema 'APP'`. It's OK.
 
 Run `./plot.py` to draw the table.
