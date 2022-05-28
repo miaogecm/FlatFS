@@ -19,7 +19,6 @@
 struct ndcache {
     struct ndcache_per_cpu {
         struct list_head lru_list;
-        rwlock_t lock;
 
         struct ndcache_entry {
             brt_node_t *node;
@@ -37,11 +36,9 @@ extern struct ndcache_stat {
 #define ndcache_for_each_entry(ndc, pos, body) \
     {                                          \
         struct ndcache_per_cpu *__c = &(ndc)->u[smp_processor_id()];        \
-        read_lock(&__c->lock);                       \
         list_for_each_entry(pos, &__c->lru_list, list) { if ((pos)->node) { \
             body                     \
         } }   \
-        read_unlock(&__c->lock);   \
     }
 
 #ifdef CONFIG_NDCACHE_STATISTICS

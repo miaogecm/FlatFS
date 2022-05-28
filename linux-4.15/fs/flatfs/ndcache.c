@@ -30,7 +30,6 @@ void ndcache_init(brt_tree_t *tree) {
             INIT_LIST_HEAD(&entry->list);
             list_add_tail(&entry->list, &cache->lru_list);
         }
-        rwlock_init(&cache->lock);
 #ifdef CONFIG_NDCACHE_STATISTICS
         atomic_set(&ndcache_stat.hit, 0);
         atomic_set(&ndcache_stat.miss, 0);
@@ -42,7 +41,6 @@ void ndcache_init(brt_tree_t *tree) {
 void ndcache_insert(brt_tree_t *tree, brt_node_t *node) {
     struct ndcache_entry *entry;
     struct ndcache_per_cpu *cache = &tree->ndc->u[smp_processor_id()];
-    write_lock(&cache->lock);
     entry = list_last_entry(&cache->lru_list, struct ndcache_entry, list);
     if (entry->node) {
         brt_nd_put(tree, entry->node);
@@ -53,19 +51,16 @@ void ndcache_insert(brt_tree_t *tree, brt_node_t *node) {
 #ifdef CONFIG_NDCACHE_STATISTICS
     atomic_inc(&ndcache_stat.miss);
 #endif
-    write_unlock(&cache->lock);
 }
 
 void ndcache_access(brt_tree_t *tree, struct ndcache_entry *entry, brt_node_t *node) {
     struct ndcache_per_cpu *cache = &tree->ndc->u[smp_processor_id()];
-    write_lock(&cache->lock);
     if (likely(entry->node == node)) {
         list_move(&entry->list, &cache->lru_list);
     }
 #ifdef CONFIG_NDCACHE_STATISTICS
     atomic_inc(&ndcache_stat.hit);
 #endif
-    write_unlock(&cache->lock);
 }
 
 void ndcache_flush(brt_tree_t *tree) {
