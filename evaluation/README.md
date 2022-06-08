@@ -221,7 +221,7 @@ Run `./plot.py` to draw the figure.
 
 Change current directory `evaluation/hive`.
 
-Run `export TBL_PATH=~/hive/table` and `./mktable` to make tables.
+Run `export TBL_PATH=~/hive/table` and `./mktable` to generate tested tables for the experiment.
 
 Run `./clean` to clean old data.
 
