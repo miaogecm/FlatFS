@@ -16,7 +16,7 @@ FlatFS is a metadata-optimized file system built for fast non-volatile memory (N
 
 `git clone https://github.com/miaogecm/FlatFS.git`. 
 
-This repository contains FlatFS source code and our modified virtual file system to support coordinated path walk.
+This repository contains FlatFS source code and our modified virtual file system to support coordinated path walk. FlatFS cannot be compiled as a kernel module. Its path walk model requires VFS supports.
 
 #### 2. Compile and Install FlatFS
 
