@@ -2,9 +2,9 @@
 
 . ../common/color.sh
 
-. ../common/fs/$fs.sh
-
 fs=$1
+
+. ../common/fs/$fs.sh
 
 fs_mount
 
