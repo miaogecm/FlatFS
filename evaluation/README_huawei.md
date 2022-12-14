@@ -30,7 +30,7 @@ Make sure there is one person running experiments at a time on our machine becau
 
 #### 5. Reproducing Experiments
 
-The `/home/flatfs/flat-fs/evaluation/` directory include scripts to reproduce the main experiment results. BetrFS and VFS-opt run on old Linux kernels and have many issues running benchmarks and applications. Please follow instructions below to reproduce the main results:
+The `/home/flatfs/flat-fs-github/evaluation/` directory include scripts to reproduce the main experiment results. BetrFS and VFS-opt run on old Linux kernels and have many issues running benchmarks and applications. Please follow instructions below to reproduce the main results:
 
 ##### 5.0 Initialization
 
