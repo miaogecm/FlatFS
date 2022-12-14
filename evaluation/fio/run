@@ -6,6 +6,8 @@ blksize=(64b 256b 1k 4k)
 
 rep=10
 
+fs=$1
+
 . ../common/fs/$fs.sh
 
 fs_mount
