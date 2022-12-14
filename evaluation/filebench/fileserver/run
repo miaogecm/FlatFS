@@ -2,7 +2,7 @@
 
 . ../../common/color.sh
 
-nthreads=(1 8 16 24 32 40 48)
+nthreads=(1 8 16 24)
 nfile=100000
 meandirwidth=2
 
