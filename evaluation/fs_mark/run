@@ -1,0 +1,13 @@
+#!/bin/bash
+
+. ../common/color.sh
+
+. ../common/fs/$fs.sh
+
+fs_mount
+
+cset shield -k on -c 0
+cset shield -e -- ./fs_mark -d $M -s 256 -n 100000
+cset shield -r
+
+fs_umount
