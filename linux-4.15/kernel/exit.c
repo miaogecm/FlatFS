@@ -864,6 +864,7 @@ void __noreturn do_exit(long code)
 	exit_task_namespaces(tsk);
 	exit_task_work(tsk);
 	exit_thread(tsk);
+    kfree(tsk->sok_pool_pool);
     kfree(tsk->cursors);
 
 	/*

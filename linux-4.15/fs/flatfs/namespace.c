@@ -25,8 +25,9 @@
 #include <linux/flatfs_define.h>
 
 #include "flatfs.h"
-#include "brtree.h"
-#include "brbag.h"
+#include "brtree/bag.h"
+#include "brtree/tree.h"
+#include "brtree/pslab.h"
 
 extern int ppc_may_lookup(ppcs_t ppc);
 
@@ -119,13 +120,16 @@ got_qr:
         goto out2;
     }
 
+#if 0
     if (unlikely(perm_check && !ppc_may_lookup(qr.ppcs))) {
         iput(inode);
         inode = ERR_PTR(-EACCES);
     }
+#endif
 
 out2:
     if (get_ppc && likely(!IS_ERR(inode))) {
+#if 0
         size_t n_ppc = ppcs_n_ppc(qr.ppcs);
         ppc_t ino_ppc = ino2pppc(inode);
         void *buf;
@@ -138,6 +142,8 @@ out2:
         *get_ppc = ppcs_from_narr(buf, 0);
         ppcs_append(get_ppc, qr.ppcs, 0, ppcs_depth(qr.ppcs));
         ppcs_append_ppc(get_ppc, ino_ppc);
+#endif
+        *get_ppc = PPCS_NULL;
     }
 
     if (got) {
@@ -162,8 +168,8 @@ void flatfs_namespace_init(struct flatfs_sb_info* sbi, int mount_format) {
     brbag_init();
 
 	if (mount_format) {
-		init_node_block_lists(sbi);
-		init_entry_block_lists(sbi);
+        flatfs_oc_init(sbi->super);
+        brt_init(sbi->super);
         flatfs_init_ptrees(sbi->super);
         *tree = flatfs_get_tree(sbi->super);
 		flatfs_register_sysctl();
@@ -182,6 +188,8 @@ void flatfs_namespace_init(struct flatfs_sb_info* sbi, int mount_format) {
     INIT_LIST_HEAD(&root_domain->children);
     sbi->root_domain = root_domain;
 
+    INIT_LIST_HEAD(&sbi->leaf_list_head);
+
 #ifdef CONFIG_FLATFS_DEBUG
 	printk("flatfs namespace init: sbi %016lx tree %016lx\n", sbi, tree);
 #endif
@@ -191,7 +199,5 @@ void flatfs_namespace_init(struct flatfs_sb_info* sbi, int mount_format) {
  * flatfs_namespace_deinit: free the namespace
  */
 void flatfs_namespace_deinit(struct flatfs_sb_info* sbi) {
-	deinit_node_block_list(sbi);
-	deinit_entry_block_list(sbi);
     /* TODO: Tree deinit */
 }

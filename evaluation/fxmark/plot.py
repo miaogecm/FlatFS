@@ -12,8 +12,8 @@ with open('.data') as f:
         fs, mwcm_thruput, mwum_thruput = line.strip().split()
         all_fs.append(fs)
 
-        mwcm_thruputs.append(mwcm_thruput)
-        mwum_thruputs.append(mwum_thruput)
+        mwcm_thruputs.append(float(mwcm_thruput) / 1000)
+        mwum_thruputs.append(float(mwum_thruput) / 1000)
 
 table_header = [''] + all_fs
 table_data = [

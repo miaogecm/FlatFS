@@ -22,7 +22,7 @@ data = {
 with open('.data') as f:
     for line in f.readlines():
         fs, status_latency, commit_latency = line.strip().split()
-        data[fs] = [float(status_latency), float(commit_latency)]
+        data[fs] = [float(status_latency), float(commit_latency)] if fs != 'flatfs_opt' else [float(status_latency)]
 
 ext4 =  data['ext4']
 xfs =   data['xfs']
@@ -66,23 +66,8 @@ plt.xlim(0,6.5)
 
 font3 = {'size': '9','fontname':'Times New Roman'}
 x1=0.3
-ax.text(x1-0.05,1.4,'1.37',font3)
-ax.text(x1+0.31,1.5,'1.44',font3)
-ax.text(x1+0.7,1.25,'1.16',font3)
-ax.text(x1+1.05,1.7,'1.63',font3)
-ax.text(x1+1.4,2.55,'2.47',font3)
-ax.text(x1+1.75,1.45,'1.36',font3)
-ax.text(x1+2.1,1.2,'1.12',font3)
-ax.text(x1+2.5,0.7,'0.6',font3)
 
 x1=3.7
-ax.text(x1-0.05,1.4,'1.32',font3)
-ax.text(x1+0.31,1.45,'1.38',font3)
-ax.text(x1+0.7,1.25,'1.16',font3)
-ax.text(x1+1.05,1.7,'1.60',font3)
-ax.text(x1+1.4,1.4,'1.24',font3)
-ax.text(x1+1.75,1.3,'1.23',font3)
-ax.text(x1+2.15,1.05,'1.0',font3)
 
 # bbox_to_anchor (x, y, width, height)
 ax.legend(('Ext4', 'XFS', 'PMFS', 'NOVA', 'BetrFS', 'VFS-opt', 'FlatFS', 'Git-opt+FlatFS'),

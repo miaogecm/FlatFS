@@ -59,16 +59,11 @@
 #include <linux/fastr.h>
 #include <linux/bitmap.h>
 #include <linux/pathman.h>
+#include <drm/drm_fixed.h>
 
 #include "flatfs.h"
 #include "dax.h"
-#include "brtree.h"
-
-struct copy_dot_info {
-    __le64 *valp;
-	fastr_t path;
-	struct list_head list;
-};
+#include "brtree/tree.h"
 
 /*
  * Couple of helper functions - make the code slightly cleaner.
@@ -269,8 +264,8 @@ static int flatfs_symlink(struct inode *dir, struct dentry *dentry, const char *
 
     rewalk_key = fastr(kmalloc(fe->d_fullpath.len + 2, GFP_ATOMIC), 0);
     fastr_append(&rewalk_key, fe->d_fullpath);
-    fastr_append_ch(&rewalk_key, '/');
-    fastr_append_ch(&rewalk_key, ASCII_REWALK);
+    fastr_append_ch(&rewalk_key, CTLCHR_COMPONENT_SEPARATOR);
+    fastr_append_ch(&rewalk_key, CTLCHR_PREFIX_INTERCEPTOR);
 
     /* insert rewalk entry */
     err = flatfs_namespace_insert(tree_of(fe), rewalk_key,
@@ -404,8 +399,8 @@ static int flatfs_unlink(struct inode* dir, struct dentry *dentry)
 		
     	rewalk_path = fastr(buf, 0);
     	fastr_append(&rewalk_path, fe->d_fullpath);
-		fastr_append_ch(&rewalk_path, '/');
-		fastr_append_ch(&rewalk_path, ASCII_REWALK);
+		fastr_append_ch(&rewalk_path, CTLCHR_COMPONENT_SEPARATOR);
+		fastr_append_ch(&rewalk_path, CTLCHR_PREFIX_INTERCEPTOR);
 
 		FLATFS_INFO(FS_UNLINK, "remove rewalk entry: %.*s %.*s", FASTR_FMT(fe->d_fullpath), FASTR_FMT(rewalk_path));
 
@@ -438,12 +433,10 @@ out:
 static int flatfs_mkdir(struct inode *dir, struct dentry *dentry, umode_t mode)
 {
     struct fentry *fe = (struct fentry *) dentry;
-	struct inode *inode = NULL;
-	struct flatfs_inode *pi, *pidir;
 	struct super_block *sb = dir->i_sb;
+	struct flatfs_inode *pi, *pidir;
 	flatfs_transaction_t *trans;
-	fastr_t dent;
-    ppc_t ppc;
+	struct inode *inode = NULL;
     int ret = 0;
     long err;
 
@@ -508,54 +501,8 @@ static int flatfs_mkdir(struct inode *dir, struct dentry *dentry, umode_t mode)
 	flatfs_commit_transaction(sb, trans);
     trans = NULL;
 
-    dent = fastr(kmalloc(fe->d_fullpath.len + 4, GFP_ATOMIC), 0);
-    fastr_append(&dent, fe->d_fullpath);
-    fastr_append_ch(&dent, '/');
-
-    ppc = ino2pppc(inode);
-
-	/* create shadow entry */
-    fastr_append_ch(&dent, ASCII_FIRST);
-    err = flatfs_namespace_insert(tree_under(fe), dent, SHADOW_DENTRY_INO, fe->d_ppcs, ppc);
-	if (err) {
-        ret = err > 0 ? -EEXIST : (int) err;
-        goto out_free_inode;
-    }
-    FLATFS_INFO(FS_MKDIR, "bplus_tree_insert: %.*s", FASTR_FMT(dent));
-
-	/* create shadow entry */
-	dent.chars[dent.len - 1] = ASCII_LAST;
-    err = flatfs_namespace_insert(tree_under(fe), dent, SHADOW_DENTRY_INO, fe->d_ppcs, ppc);
-	if (err) {
-        ret = err > 0 ? -EEXIST : (int) err;
-        goto out_free_inode;
-    }
-    FLATFS_INFO(FS_MKDIR, "bplus_tree_insert: %.*s", FASTR_FMT(dent));
-
-	/* create dot */
-    dent.chars[dent.len - 1] = '.';
-    err = flatfs_namespace_insert(tree_under(fe), dent, (inode->i_ino >> FLATFS_INODE_BITS),
-                                  fe->d_ppcs, ppc);
-	if (err) {
-        ret = err > 0 ? -EEXIST : (int) err;
-        goto out_free_inode;
-    }
-	FLATFS_INFO(FS_MKDIR, "bplus_tree_insert: %.*s", FASTR_FMT(dent));
-
-	/* create dotdot */
-	fastr_append_ch(&dent, '.');
-    err = flatfs_namespace_insert(tree_under(fe), dent, (dir->i_ino >> FLATFS_INODE_BITS),
-                                  fe->d_ppcs, ppc);
-	if (err) {
-        ret = err > 0 ? -EEXIST : (int) err;
-        goto out_free_inode;
-    }
-    FLATFS_INFO(FS_MKDIR, "bplus_tree_insert: %.*s", FASTR_FMT(dent));
-
 	FLATFS_INFO(FS_MKDIR, "ino[%lu] count[%d] %.*s",
                 inode->i_ino, atomic_read(&inode->i_count), FASTR_FMT(fe->d_fullpath));
-
-	kfree(dent.chars);
 
 out_free_inode:
     if (unlikely(ret)) {
@@ -576,89 +523,28 @@ out:
  * return 1 if empty
  */
 static int flatfs_empty_dir(struct fentry *fe) {
-    fastr_t key = dir_min_key(fe->d_fullpath);
+    fastr_t path = fe->d_fullpath, next;
     DEFINE_BRT_QR(qr, BRT_QR_RAW);
     brt_it_t it;
-    int ret, t;
+    int ret;
 
-    brt_lobnd(tree_under(fe), &it, key);
-    kfree(key.chars);
+    brt_scan(tree_under(fe), &it, path, FASTR_LITERAL("\x7f"));
 
-    /*
-     * path/\xASCII_FIRST
-     * path/.
-     * path/..
-     * path/\xASCII_LAST
-     */
-    for (t = 0; t < 4; t++) {
-        ret = brt_it_next(&it, &qr);
-        if (unlikely(ret == -ENOENT)) {
-            ret = 0;
-            goto out;
-        }
+    /* Skip the directory itself. */
+    ret = brt_it_next(&it, &qr, 0);
+    BUG_ON(ret);
+
+    ret = brt_it_next(&it, &qr, 0);
+
+    if (unlikely(ret == -ENOENT)) {
+        ret = 1;
+    } else {
+        next = qr.path;
+        ret = !fastr_is_prefix(next, path) || next.chars[path.len] != CTLCHR_COMPONENT_SEPARATOR;
     }
 
-    ret = !fastr_is_empty(qr.path) && qr.path.chars[qr.path.len - 1] == ASCII_LAST;
-
-out:
     brt_it_close(&it);
     return ret;
-}
-
-static int __flatfs_rmdir(fastr_t dirpath, void *subtree, struct flatfs_sb_info *flatfs_sbi) {
-	char *dir_entry_buffer;
-	fastr_t dir_entry;
-    int err;
-
-    dir_entry_buffer = kmalloc(dirpath.len + 4, GFP_ATOMIC);
-    dir_entry = fastr(dir_entry_buffer, 0);
-    fastr_append(&dir_entry, dirpath);
-    fastr_append_ch(&dir_entry, '/');
-	dir_entry.len ++;
-
-    /* create shadow entry */
-	dir_entry.chars[dir_entry.len - 1] = ASCII_FIRST;
-    if ((err = flatfs_namespace_remove(subtree, dir_entry))) {
-        goto out;
-    }
-
-#ifdef CONFIG_FLATFS_DEBUG
-    printk("bplus_tree_remove: %.*s\n", FASTR_FMT(dir_entry));
-#endif
-
-    /* create shadow entry */
-    dir_entry.chars[dir_entry.len - 1] = ASCII_LAST;
-    if ((err = flatfs_namespace_remove(subtree, dir_entry))) {
-        goto out;
-    }
-
-#ifdef CONFIG_FLATFS_DEBUG
-    printk("bplus_tree_remove: %.*s\n", FASTR_FMT(dir_entry));
-#endif
-
-    /* create dot */
-    dir_entry.chars[dir_entry.len - 1] = '.';
-    if ((err = flatfs_namespace_remove(subtree, dir_entry))) {
-        goto out;
-    }
-
-#ifdef CONFIG_FLATFS_DEBUG
-    printk("bplus_tree_remove: %.*s\n", FASTR_FMT(dir_entry));
-#endif
-
-    /* create dotdot */
-    fastr_append_ch(&dir_entry, '.');
-    if ((err = flatfs_namespace_remove(subtree, dir_entry))) {
-        goto out;
-    }
-
-#ifdef CONFIG_FLATFS_DEBUG
-    printk("bplus_tree_remove: %.*s\n", FASTR_FMT(dir_entry));
-#endif
-
-out:
-    kfree(dir_entry_buffer);
-	return err;
 }
 
 static int __flatfs_remove_file(struct super_block *sb, struct inode *dir,
@@ -740,12 +626,12 @@ void range_insert(struct super_block *sb, brt_tree_t *dst, brt_tree_t *src) {
     DEFINE_BRT_QR(dqr, BRT_QR_RAW);
     int ret;
 
-    brt_lobnd(src, &sit, FASTR_LITERAL("\0"));
-    ret = brt_it_next(&sit, &sqr);
+    brt_scan(src, &sit, FASTR_LITERAL("\0"), FASTR_LITERAL("\x7f"));
+    ret = brt_it_next(&sit, &sqr, 0);
     BUG_ON(ret);
-    brt_lobnd(dst, &dit, sqr.path);
+    brt_scan(dst, &dit, sqr.path, FASTR_LITERAL("\x7f"));
     brt_it_close(&sit);
-    ret = brt_it_next(&dit, &dqr);
+    ret = brt_it_next(&dit, &dqr, 0);
 
     if (unlikely(ret == -ENOENT)) {
         /* src > dst, just append src to dst */
@@ -784,26 +670,16 @@ static int __flatfs_rmdir_recur(struct super_block *sb, struct domain *domain, s
 
 	/* remove all nodes in B+ tree */
     subtree = flatfs_get_tree(sb);
-    left = dir_min_key(dirpath);
-    right = dir_max_key_outer(dirpath);
+    left = dirpath;
+    right = dir_path_upperbound(dirpath);
     range_remove(sb, &subtree, tree, left, right);
-    kfree(left.chars);
     kfree(right.chars);
 
     /* free inodes */
-    brt_lobnd(&subtree, &it, FASTR_LITERAL("\0"));
-    while (!brt_it_next(&it, &qr)) {
+    brt_scan(&subtree, &it, FASTR_LITERAL("\0"), FASTR_LITERAL("\x7f"));
+    while (!brt_it_next(&it, &qr, 0)) {
         ino = qr.inode;
         path = qr.path;
-
-        /* skip shadow entry */
-		if (ino == SHADOW_DENTRY_INO)
-            continue;
-
-		/* skip dot and dotdot */
-		if ((path.chars[path.len - 1] == '.' && path.chars[path.len - 2] == '/') ||
-			(path.chars[path.len - 1] == '.' && path.chars[path.len - 2] == '.' && path.chars[path.len - 3] == '/'))
-            continue;
 
 		pi = flatfs_get_inode(sb, le64_to_cpu(ino) << FLATFS_INODE_BITS);
 
@@ -891,24 +767,9 @@ static int flatfs_rmdir_recur(struct inode *dir, struct dentry *dentry) {
 	pidir = flatfs_get_inode(sb, dir->i_ino);
 	flatfs_dec_count(dir, pidir);
 
-	/* finally, remove that directory */
-	err = flatfs_namespace_remove(tree_of(fe), path);
-	if (err) {
-		flatfs_abort_transaction(sb, trans);
-		goto err;
-	}
-
 	flatfs_commit_transaction(sb, trans);
 err:
 	return err;
-}
-
-static inline int is_dot(fastr_t path) {
-	return path.chars[path.len - 1] == '.' && path.chars[path.len - 2] == '/';
-}
-
-static inline int is_dotdot(fastr_t path) {
-	return path.chars[path.len - 1] == '.' && path.chars[path.len - 2] == '.' && path.chars[path.len - 3] == '/';
 }
 
 static inline void cpdir_fix_dot_or_dotdot(brt_tree_t *tree, __le64 *valp, fastr_t path, struct inode *to_ino) {
@@ -1163,7 +1024,6 @@ static int __flatfs_cpdir_recur(struct flatfs_sb_info *sbi, brt_tree_t *subtree,
 	struct inode *src_inode;
 	fastr_t path;
 	struct list_head fix_dot_list_head;
-	struct copy_dot_info *dot_info, *tmp2;
 	ino_t ino;
 	int err = 0;
     brt_it_t it;
@@ -1171,36 +1031,10 @@ static int __flatfs_cpdir_recur(struct flatfs_sb_info *sbi, brt_tree_t *subtree,
 
     INIT_LIST_HEAD(&fix_dot_list_head);
 
-    brt_lobnd(subtree, &it, FASTR_LITERAL("\0"));
-    while (!brt_it_next(&it, &qr)) {
+    brt_scan(subtree, &it, FASTR_LITERAL("\0"), FASTR_LITERAL("\x7f"));
+    while (!brt_it_next(&it, &qr, 0)) {
         ino = qr.inode;
         path = qr.path;
-
-        /* skip shadow entry */
-		if (ino == SHADOW_DENTRY_INO)
-            continue;
-
-		/* skip dot and dotdot */
-		if (is_dot(path) || is_dotdot(path)) {
-            fastr_t path_dup;
-
-			if (is_dot(path)) {
-				/* prepare current directory path */
-				fastr_shrink_suf(&path, 2);
-			} else {
-				/* prepare current directory path */
-				fastr_shrink_suf(&path, 3);
-				fastr_reserve_pre(&path, fastr_find_last(path, '/'));
-			}
-
-            path_dup = fastr(kmalloc(path.len, GFP_ATOMIC), 0);
-            fastr_append(&path_dup, path);
-			dot_info = kmalloc(sizeof(struct copy_dot_info), GFP_ATOMIC);
-            dot_info->valp = qr.valp;
-			dot_info->path = path_dup;
-			list_add(&dot_info->list, &fix_dot_list_head);
-            continue;
-		}
 
 		pi = flatfs_get_inode(sb, le64_to_cpu(ino) << FLATFS_INODE_BITS);
 		src_inode = flatfs_iget(sb, le64_to_cpu(ino) << FLATFS_INODE_BITS);
@@ -1230,14 +1064,6 @@ static int __flatfs_cpdir_recur(struct flatfs_sb_info *sbi, brt_tree_t *subtree,
 		iput(src_inode);
     }
     brt_it_close(&it);
-
-	/* fix dot and dotdot files */
-	list_for_each_entry_safe(dot_info, tmp2, &fix_dot_list_head, list) {
-		cpdir_fix_dot_or_dotdot(subtree, dot_info->valp, dot_info->path, to_ino);
-
-		list_del(&dot_info->list);
-		kfree(dot_info);
-	}
 
 out:
 	return err;
@@ -1284,8 +1110,8 @@ static int flatfs_cpdir_recur(struct dentry *from, struct inode *to_dir, struct 
 
 	/* 1. slice out the subtree */
     subtree = flatfs_get_tree(sb);
-	left = dir_min_key_outer(from_fe->d_fullpath);
-	right = dir_max_key_outer(from_fe->d_fullpath);
+	left = dir_path_lowerbound(from_fe->d_fullpath);
+	right = dir_path_upperbound(from_fe->d_fullpath);
 	range_remove(sb, &subtree, tree_under(from_fe), left, right);
 	kfree(left.chars);
 	kfree(right.chars);
@@ -1352,11 +1178,6 @@ static int flatfs_rmdir(struct inode *dir, struct dentry *dentry)
 		printk("flatfs_rmdir: empty directory %.*s ino %lu has nlink!=2 (%d)",
                FASTR_FMT(fe->d_fullpath), inode->i_ino, inode->i_nlink);
 
-	/* remove the key-value pair */
-	ret = __flatfs_rmdir(fe->d_fullpath, tree_under(fe), flatfs_sbi);
-	if (ret)
-		goto out;
-
 	FLATFS_INFO(FS_RMDIR, "bplus_tree_remove: %.*s", FASTR_FMT(fe->d_fullpath));
 
 	trans = flatfs_new_transaction(sb, MAX_INODE_LENTRIES * 2 +
@@ -1418,8 +1239,8 @@ void flatfs_d_set_mounted(struct dentry *dentry) {
     /* slice out subtree under mntpoint */
     subtree = kmalloc(sizeof(brt_tree_t), GFP_ATOMIC);
     *subtree = flatfs_get_tree(sb);
-    left = dir_min_key(fe->d_fullpath);
-    right = dir_max_key_outer(fe->d_fullpath);
+    left = dir_path_lowerbound(fe->d_fullpath);
+    right = dir_path_upperbound(fe->d_fullpath);
     range_remove(sb, subtree, tree, left, right);
     kfree(left.chars);
     kfree(right.chars);
@@ -1431,8 +1252,8 @@ void flatfs_d_set_mounted(struct dentry *dentry) {
     /* insert rewalk key */
     rewalk_key = fastr(kmalloc(fe->d_fullpath.len + 2, GFP_ATOMIC), 0);
     fastr_append(&rewalk_key, fe->d_fullpath);
-    fastr_append_ch(&rewalk_key, '/');
-    fastr_append_ch(&rewalk_key, ASCII_REWALK);
+    fastr_append_ch(&rewalk_key, CTLCHR_COMPONENT_SEPARATOR);
+    fastr_append_ch(&rewalk_key, CTLCHR_PREFIX_INTERCEPTOR);
     flatfs_namespace_insert(tree, rewalk_key,
                             (inode->i_ino >> FLATFS_INODE_BITS) | INO_ANNOTATE_MNTPOINT, ppcs, ino2pppc(inode));
     kfree(rewalk_key.chars);
@@ -1481,8 +1302,8 @@ void flatfs_d_set_umounted(struct dentry *dentry) {
     /* remove rewalk key in parent domain */
     rewalk_key = fastr(kmalloc(fe->d_fullpath.len + 2, GFP_ATOMIC), 0);
     fastr_append(&rewalk_key, fe->d_fullpath);
-    fastr_append_ch(&rewalk_key, '/');
-    fastr_append_ch(&rewalk_key, ASCII_REWALK);
+    fastr_append_ch(&rewalk_key, CTLCHR_COMPONENT_SEPARATOR);
+    fastr_append_ch(&rewalk_key, CTLCHR_PREFIX_INTERCEPTOR);
     flatfs_namespace_remove(ptree, rewalk_key);
     kfree(rewalk_key.chars);
 
@@ -1522,11 +1343,11 @@ static void range_rename_point(struct super_block *sb,
     brt_it_t it;
     int err;
 
-    left = dir_min_key(old_path);
-    right = dir_max_key(old_path);
+    left = dir_path_lowerbound(old_path);
+    right = dir_path_upperbound(old_path);
 
-    brt_lobnd(old_tree, &it, left);
-    while (!(err = brt_it_next(&it, &qr)) && fastr_strcmp(qr.path, right) <= 0) {
+    brt_scan(old_tree, &it, left, FASTR_LITERAL("\x7f"));
+    while (!(err = brt_it_next(&it, &qr, 0)) && fastr_strcmp(qr.path, right) <= 0) {
         struct changelist *r = kmalloc(sizeof(*r), GFP_ATOMIC);
         ppcs_t ppcs;
         void *buf;
@@ -1576,8 +1397,8 @@ static void range_rename_batch(struct super_block *sb,
     ppcs_t dst_pppc;
 
     subtree = flatfs_get_tree(sb);
-    left = dir_min_key_outer(old_path);
-    right = dir_max_key_outer(old_path);
+    left = dir_path_lowerbound(old_path);
+    right = dir_path_upperbound(old_path);
     range_remove(sb, &subtree, old_tree, left, right);
     kfree(left.chars);
     kfree(right.chars);

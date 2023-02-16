@@ -1660,7 +1660,7 @@ static struct ctl_table vm_table[] = {
 
 extern int ndcache_enable;
 extern int use_range_rename_batch;
-extern int use_woc_key;
+//extern int use_woc_key;
 
 static struct ctl_table fs_table[] = {
 	{
@@ -1869,6 +1869,7 @@ static struct ctl_table fs_table[] = {
         .mode		= 0644,
         .proc_handler	= proc_dointvec,
     },
+#if 0
     {
         .procname	= "use-woc-key",
         .data       = &use_woc_key,
@@ -1876,6 +1877,7 @@ static struct ctl_table fs_table[] = {
         .mode		= 0644,
         .proc_handler	= proc_dointvec,
     },
+#endif
 	{ }
 };
 

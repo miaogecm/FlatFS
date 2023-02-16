@@ -66,14 +66,71 @@ typedef struct {
     ppc_t pppc;
 } __packed brt_chgpre_opt_t;
 
-typedef struct brt_tree_s brt_tree_t;
-typedef struct brt_node_s brt_node_t;
-typedef struct brt_ent_s brt_ent_t;
-typedef struct brt_it_s brt_it_t;
-typedef struct brt_qr_s brt_qr_t;
-typedef struct brt_stat_s brt_stat_t;
-typedef struct brt_entblk_hdr_s brt_entblk_hdr_t;
-typedef struct brt_nodeblk_hdr_s brt_nodeblk_hdr_t;
+typedef struct brt_tree_s   brt_tree_t;
+typedef struct brt_inode_s  brt_inode_t;
+typedef struct brt_vnode_s  brt_vnode_t;
+typedef struct brt_dnode_s  brt_dnode_t;
+typedef void                brt_node_t;
+typedef struct brt_qr_s     brt_qr_t;
+typedef struct brt_it_s     brt_it_t;
+typedef struct brt_ndstat_s brt_ndstat_t;
+typedef struct brt_stat_s   brt_stat_t;
+
+/* A FlatFS BrTree in DRAM */
+struct brt_tree_s {
+    struct flatfs_sb_info *sbi;
+    brt_ptree_t *ptree;
+    /*
+     * protects concurrent rw of root
+     * field and ptree->root field.
+     */
+    rwlock_t root_lock;
+    /* The calculated address of ptree->root */
+	brt_node_t *root;
+    /* Be calculated when mounting */
+    int height;
+    /* the node cache */
+    struct ndcache *ndc;
+};
+
+/* lookup/range query result (qr) */
+struct brt_qr_s {
+    /*
+     * BRT_QR_RAW:
+     * Find the first entry == key, full
+     * match.
+     *
+     * BRT_QR_SEM:
+     * Find with semantics. Match the longest
+     * semantic prefix of key, whose entry
+     * exists, and terminates with \x7f.
+     *
+     * BRT_QR_PERM:
+     * Query permission, store in @ppcs.
+     */
+    enum {
+        BRT_QR_RAW = 1,
+        BRT_QR_SEM = 2,
+        BRT_QR_PERM = 4
+    } mode;
+
+    /* the effective path of this lookup */
+    fastr_t path;
+
+    /* inode and PPCs of the target */
+    ino_t inode;
+    /* a pointer to the value, only available in scan */
+    __le32 *valp;
+    /*
+     * The @ppcs contains many PPCs. Note that the
+     * actual PPC array comes from either @embed_ppcs,
+     * for well-compressed PPCs, or a kmalloc.
+     */
+    ppcs_t ppcs;
+
+    /* @see the ppcs field */
+    ppc_t embed_ppcs[8];
+};
 
 #define DEFINE_BRT_QR(name, _mode)    \
     brt_qr_t name = { .mode = (_mode) }
@@ -181,8 +238,6 @@ struct flatfs_inode {
 	char	padding[3]; /* pad to ensure truncate_item starts 8-byte aligned */
 } __attribute__((packed));
 
-#define SHADOW_DENTRY_INO		0x1FFFFFFFFFFFFFFF
-
 /* This is a per-inode structure and follows immediately after the 
  * struct flatfs_inode. It is used to implement the truncate linked list and is 
  * by flatfs_truncate_add(), flatfs_truncate_del(), and flatfs_recover_truncate_list()
@@ -268,8 +323,8 @@ struct flatfs_super_block {
 	__le32		s_inodes_used_count[FLATFS_NCPU];
 	__le32		s_free_inode_hint[FLATFS_NCPU];
 
-	__le64  	s_node_blocknr; /* start node block number */
-	__le64 		s_entry_blocknr; /* start entry block number */
+    __le64      s_oc_desc;
+
 
     brt_ptree_t trees[FLATFS_MAX_TREE_N];
 } __attribute__((packed));

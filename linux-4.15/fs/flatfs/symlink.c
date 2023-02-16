@@ -25,7 +25,6 @@
 #include <linux/fs.h>
 #include <linux/namei.h>
 
-#include "brtree.h"
 #include "flatfs.h"
 
 int flatfs_block_symlink(struct inode *inode, const char *symname, int len)

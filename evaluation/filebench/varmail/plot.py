@@ -19,7 +19,7 @@ with open('.data') as f:
         fs, meandirwidth, thruput = line.strip().split()
         if data[fs] == default:
             data[fs] = []
-        data[fs].append(float(thruput))
+        data[fs].append(float(thruput) / 1000)
 
 ext4 = data['ext4']
 xfs = data['xfs']

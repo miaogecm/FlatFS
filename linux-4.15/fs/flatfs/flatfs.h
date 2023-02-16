@@ -49,6 +49,8 @@
 #define PAGE_SIZE_2M	0x200000
 #define PAGE_SIZE_1G	0x40000000
 
+#define FLATFS_VADDR_PRE        0xffff000000000000ul
+
 #define FLATFS_ASSERT(x) \
 	do { if (!(x)) {                                                     \
 		printk(KERN_WARNING "assertion failed %s:%d: %s\n",     \
@@ -387,15 +389,22 @@ static inline void *flatfs_get_block(struct super_block *sb, u64 block)
 	return block ? ((void *)ps + block) : NULL;
 }
 
+static inline bool nvm_ptr(struct flatfs_sb_info* sbi, void* ptr) {
+	return ((unsigned long)ptr >= (unsigned long)sbi->virt_addr &&
+		(unsigned long)ptr <= ((unsigned long)sbi->virt_addr + sbi->initsize));
+}
+
 static inline void* flatfs_offset_to_address(struct super_block* sb, __le64 offset)
 {
 	struct flatfs_super_block *ms = flatfs_get_super(sb);
+    BUG_ON(!nvm_ptr(FLATFS_SB(sb), (void *) ms + offset));
 	return (void*)((unsigned long)ms + offset);
 }
 
 static inline __le64 flatfs_address_to_offset(struct super_block* sb, void* address) {
 	struct flatfs_super_block *ms = flatfs_get_super(sb);
-	return ((unsigned long)address - (unsigned long)ms);
+    BUG_ON(!nvm_ptr(FLATFS_SB(sb), address));
+    return ((unsigned long) address - (unsigned long) ms);
 }
 
 /* uses CPU instructions to atomically write up to 8 bytes */
@@ -727,11 +736,6 @@ static inline bool flatfs_capable_wrt_inode_uidgid(const struct inode *inode, st
 	struct user_namespace *ns = current_user_ns();
 
 	return ns_capable(ns, cap) && flatfs_privileged_wrt_inode_uidgid(ns, inode, pi);
-}
-
-static inline bool nvm_ptr(struct flatfs_sb_info* sbi, void* ptr) {
-	return ((unsigned long)ptr >= (unsigned long)sbi->virt_addr && 
-		(unsigned long)ptr <= ((unsigned long)sbi->virt_addr + sbi->initsize));
 }
 
 int flatfs_register_sysctl(void);

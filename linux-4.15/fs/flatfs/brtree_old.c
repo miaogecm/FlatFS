@@ -13,9 +13,9 @@
  *      (2) Left->Right
  */
 
-#include "brtree.h"
-#include "brbag.h"
-#include "ndcache.h"
+#include "brtree_old.h"
+#include "brtree/bag.h"
+#include "brtree/ndcache.h"
 #include "treeman.h"
 #include <linux/ppcs.h>
 #include <linux/pathman.h>
@@ -60,6 +60,14 @@ static int ppcs_well_compressed(ppcs_t ppcs) {
         }
     }
     return 1;
+}
+
+static inline void verify_persistency(brt_tree_t *tree, brt_node_t *node, void *ptr) {
+    if (brt_nd_type(node) == BRT_INTN) {
+        BUG_ON(nvm_ptr(tree->sbi, ptr));
+    } else {
+        BUG_ON(!nvm_ptr(tree->sbi, ptr));
+    }
 }
 
 static size_t _verify_node(brt_tree_t *tree, brt_node_t *node,
@@ -193,7 +201,7 @@ static size_t _verify_node(brt_tree_t *tree, brt_node_t *node,
 static void sel_persist_ents(brt_node_t *node, unsigned long victims) {
     /* batch flush, one cacheline at a time */
     brt_ent_t *ent = node->entries;
-    for (; victims; victims >>= 4u, ent += 4) {
+    for (; victims; victims >>= 4u, 4) {
         if (victims & 0xf) {
             flatfs_flush_buffer(ent, CACHELINE_SIZE, 0);
         }
@@ -234,6 +242,8 @@ static u8 keys_lowerbound(brt_tree_t *tree, brt_node_t *node,
         return 0;
     }
 
+    verify_persistency(tree, node, prefix.chars);
+
     /* Skip common prefix, then we only need to compare suffix. */
     fastr_eliminate(&key, &prefix);
     if ((mismatch = fastr_first_zpword(prefix))) {
@@ -247,8 +257,11 @@ static u8 keys_lowerbound(brt_tree_t *tree, brt_node_t *node,
 
     while (l < r) {
         u8 mid = l + (r - l) / 2;
+        fastr_t suf = brt_nd_path_suf_n(tree, node, mid);
 
-        cmp = fastr_strcmp(brt_nd_path_suf_n(tree, node, mid), key);
+        verify_persistency(tree, node, suf.chars);
+
+        cmp = fastr_strcmp(suf, key);
         if (cmp < 0) {
             l = mid + 1;
         } else {
@@ -279,8 +292,8 @@ static inline void node_kill(brt_tree_t *tree, brt_node_t *node) {
 static inline void rebalance_delta(brt_node_t *dst, brt_node_t *src,
                                    brt_ent_t *ent) {
     ent->path_len = cpu_to_le16(le16_to_cpu(ent->path_len) +
-                                le16_to_cpu(src->path_delta_len) -
-                                le16_to_cpu(dst->path_delta_len));
+                                le16_to_cpu(src->delta_len) -
+                                le16_to_cpu(dst->delta_len));
 }
 
 /*
@@ -313,7 +326,7 @@ static void dup_leaf_ent(brt_tree_t *dst_tree,
 
     /* recalculate path_suf_blkn and perm_suf_blkn */
     path_len = (u16) (le16_to_cpu(src_ent->path_len) +
-                      le16_to_cpu(src_node->path_delta_len));
+                      le16_to_cpu(src_node->delta_len));
     perm_depth = ppcs_depth(brt_nd_perm_pre(src_tree, src_node));
     perm_depth += get_path_depth(brt_nd_path_suf(src_tree, src_node,
                                                  src_ent));
@@ -386,7 +399,7 @@ static void dup_intn_ent(brt_tree_t *dst_tree,
 
     /* recalculate path_suf_blkn */
     path_len = (u16) (le16_to_cpu(src_ent->path_len) +
-                      le16_to_cpu(src_node->path_delta_len));
+                      le16_to_cpu(src_node->delta_len));
     dst_ent->path_suf_blkn = DIV_ROUND_UP(path_len, blksz);
 
     /* copy other fields */
@@ -422,16 +435,16 @@ static void dup_node_pre(brt_tree_t *tree,
     size_t path_len, perm_len;
     void *src_buf, *dst_buf;
 
-    dst_buf = flatfs_offset_to_address(sb, dst->pre_buffer);
-    src_buf = flatfs_offset_to_address(sb, src->pre_buffer);
+    dst_buf = flatfs_offset_to_address(sb, dst->pre_buf);
+    src_buf = flatfs_offset_to_address(sb, src->pre_buf);
 
     dst_path_buf = dst_buf;
     src_path_buf = src_buf;
-    path_len = le16_to_cpu(src->path_pre_len);
+    path_len = le16_to_cpu(src->pre_len);
     memcpy(dst_path_buf, src_path_buf, path_len);
     flatfs_flush_buffer(dst_path_buf, path_len, 0);
-    dst->path_pre_len = src->path_pre_len;
-    dst->path_delta_len = src->path_delta_len;
+    dst->pre_len = src->pre_len;
+    dst->delta_len = src->delta_len;
 
     if (dst_ty == BRT_LEAF) {
         dst_perm_buf = dst_buf + off;
@@ -451,7 +464,7 @@ static void dup_node_pre(brt_tree_t *tree,
  * called. @src specifies the current logical owner of @ent, and
  * @dst contains the new owner of @ent.
  *
- * The most confusing root is that why we need @src, @dst for
+ * The most confusing part is that why we need @src, @dst for
  * rebuilding, rather than only a single @node? Consider the
  * following case, when we're about to move an ent from a node to
  * another node. However, it fails due to lack of space. Now we have
@@ -646,8 +659,8 @@ static void nd_pre_append(brt_tree_t *tree,
     ppcs_t perm_addend, perm_pre;
 
     path_buffer = flatfs_offset_to_address(tree->sbi->super,
-                                           node->pre_buffer);
-    path_buffer += le16_to_cpu(node->path_pre_len);
+                                           node->pre_buf);
+    path_buffer += le16_to_cpu(node->pre_len);
     memcpy(path_buffer, path_addend.chars, path_addend.len);
     flatfs_flush_buffer(path_buffer, path_addend.len, 0);
 
@@ -661,8 +674,8 @@ static void nd_pre_append(brt_tree_t *tree,
         node->perm_pre_len = cpu_to_le16(perm_pre.len);
     }
 
-    node->path_pre_len = cpu_to_le16(le16_to_cpu(node->path_pre_len) +
-                                     path_addend.len);
+    node->pre_len = cpu_to_le16(le16_to_cpu(node->pre_len) +
+                                path_addend.len);
 
     /* No flush @{path,perm}_pre_len here, caller's business. */
 }
@@ -687,7 +700,7 @@ static inline void nd_pre_shrink(brt_tree_t *tree, brt_node_t *node,
         node->perm_pre_len = cpu_to_le16(perm_pre.len);
     }
 
-    node->path_pre_len = cpu_to_le16(path_pre.len - n);
+    node->pre_len = cpu_to_le16(path_pre.len - n);
 
     /* No flush @{path,perm}_pre_len here, caller's business. */
 }
@@ -707,7 +720,7 @@ static void nd_suf_prepend(brt_tree_t *tree, brt_node_t *node,
 
     for (i = 0; i < n_keys; i++) {
         validate_ent_suf_cache(tree, node, i);
-        ent = brt_nd_ent_n(tree, node, i);
+        brt_nd_ent_n(tree, node, i);
         tmp_ent = *ent;
         ret = ent_suf_prepend(tree, node, node, &tmp_ent,
                               path_addend, max_prefetch);
@@ -854,7 +867,7 @@ static void nd_add_ent(/* insert to @dst at @pos */
             dst->perm_pre_len = cpu_to_le64(ppcs_dst.len);
         }
 
-        dst->path_pre_len = cpu_to_le64(p.len);
+        dst->pre_len = cpu_to_le64(p.len);
     }
 
     /*
@@ -881,7 +894,7 @@ static void nd_add_ent(/* insert to @dst at @pos */
 
     if (tq) {
         ent_suf_prepend(tree, dst, src, ent, q,
-                        le16_to_cpu(src->path_pre_len) - q.len);
+                        le16_to_cpu(src->pre_len) - q.len);
     } else if (tp) {
         fastr_t suf = brt_nd_path_suf(tree, src, ent);
         fastr_eliminate(&p, &suf);
@@ -889,7 +902,7 @@ static void nd_add_ent(/* insert to @dst at @pos */
     }
 
     if (tp) {
-        size_t path_pre_len = le16_to_cpu(dst->path_pre_len);
+        size_t path_pre_len = le16_to_cpu(dst->pre_len);
         nd_suf_prepend(tree, dst, p, path_pre_len - p.len);
         nd_pre_shrink(tree, dst, p.len);
     }
@@ -963,7 +976,7 @@ static brt_ent_t new_leaf_ent(brt_tree_t *tree, brt_node_t *node, u8 idx,
         ppcs_t perm_pre = brt_nd_perm_pre(tree, node);
 
         nd_suf_prepend(tree, node, pre, pre_len);
-        node->path_pre_len = cpu_to_le16(pre_len);
+        node->pre_len = cpu_to_le16(pre_len);
         max_prefetch = pre_len;
 
         depth = get_path_depth(pre);
@@ -982,7 +995,7 @@ static brt_ent_t new_leaf_ent(brt_tree_t *tree, brt_node_t *node, u8 idx,
     ent.path_suf_blkn = DIV_ROUND_UP(path_len, blksz);
     ent.perm_suf_blkn = DIV_ROUND_UP(PPCS_SIZEOF(depth), blksz);
     ent.path_suf_cached = cpu_to_le16(path_addend.len);
-    path_len -= le16_to_cpu(node->path_delta_len);
+    path_len -= le16_to_cpu(node->delta_len);
     ent.path_len = cpu_to_le16(path_len);
 
     /* create ent buffer */
@@ -1050,7 +1063,7 @@ void brt_pin(brt_tree_t *dst, brt_ptree_t *src,
     dst->sbi = sbi;
     dst->height = get_height(dst);
     dst->ndc = NULL;
-    rwlock_init(&dst->root_lock);
+    rwlock_init(&dst->crab_root_lock);
 
 #ifdef CONFIG_FLATFS_DEBUG
     printk("Created In-DRAM BrTree %lx from In-NVM BrTree %lx."
@@ -1059,9 +1072,12 @@ void brt_pin(brt_tree_t *dst, brt_ptree_t *src,
 #endif
 }
 
+extern brt_tree_t *main_brtree;
+
 void brt_set_main(brt_tree_t *tree) {
     tree->ndc = kmalloc(sizeof(struct ndcache), GFP_ATOMIC);
     ndcache_init(tree);
+    main_brtree = tree;
 }
 
 void brt_unset_main(brt_tree_t *tree) {
@@ -1105,10 +1121,9 @@ static brt_node_t *split(brt_tree_t *tree,
     __set_bit_le(BRT_VALIDMAP_ENNR, &node->validmap);
 
     validate_ent_suf_cache(tree, node, split_at);
-    ent = brt_nd_ent_n(tree, node, split_at);
+    brt_nd_ent_n(tree, node, split_at);
     if (brt_nd_type(node) == BRT_LEAF) {
         dup_intn_ent(tree, parent, &_ent, tree, node, ent);
-        ent = &_ent;
         start = split_at;
     } else {
         start = split_at + 1;
@@ -1208,14 +1223,14 @@ static void share_r(brt_tree_t *tree, brt_node_t *parent, u8 idx) {
 
     if (brt_nd_type(dst) == BRT_INTN) {
         validate_ent_suf_cache(tree, parent, pi);
-        ent = brt_nd_ent_n(tree, parent, pi);
+        brt_nd_ent_n(tree, parent, pi);
         nd_add_ent(tree, dst, dn,
                    parent, ent, brt_nd_chld_n(tree, src, 0),
                    DST_IS_SRC_CHLD, idx);
         nd_del_ent(tree, parent, pi);
 
         validate_ent_suf_cache(tree, src, 0);
-        ent = brt_nd_ent_n(tree, src, 0);
+        brt_nd_ent_n(tree, src, 0);
         nd_add_ent(tree, parent, pi,
                    src, ent, src,
                    DST_SRC_NO_RELA, -1);
@@ -1224,16 +1239,15 @@ static void share_r(brt_tree_t *tree, brt_node_t *parent, u8 idx) {
         nd_del_ent(tree, src, 0);
     } else {
         validate_ent_suf_cache(tree, src, 0);
-        ent = brt_nd_ent_n(tree, src, 0);
+        brt_nd_ent_n(tree, src, 0);
         nd_add_ent(tree, dst, dn,
                    src, ent, NULL,
                    DST_SRC_NO_RELA, 0);
         nd_del_ent(tree, parent, pi);
 
         validate_ent_suf_cache(tree, src, 1);
-        ent = brt_nd_ent_n(tree, src, 1);
+        brt_nd_ent_n(tree, src, 1);
         dup_intn_ent(tree, parent, &_ent, tree, src, ent);
-        ent = &_ent;
         nd_add_ent(tree, parent, pi,
                    src, ent, src,
                    DST_SRC_NO_RELA, -1);
@@ -1305,7 +1319,7 @@ static void share_l(brt_tree_t *tree, brt_node_t *parent, u8 idx) {
 
     if (brt_nd_type(dst) == BRT_INTN) {
         validate_ent_suf_cache(tree, parent, pi);
-        ent = brt_nd_ent_n(tree, parent, pi);
+        brt_nd_ent_n(tree, parent, pi);
         nd_add_ent(tree, dst, 0,
                    parent, ent, brt_nd_chld_n(tree, dst, 0),
                    DST_IS_SRC_CHLD, idx);
@@ -1314,21 +1328,20 @@ static void share_l(brt_tree_t *tree, brt_node_t *parent, u8 idx) {
         nd_del_ent(tree, parent, pi);
 
         validate_ent_suf_cache(tree, src, sn - 1);
-        ent = brt_nd_ent_n(tree, src, sn - 1);
+        brt_nd_ent_n(tree, src, sn - 1);
         nd_add_ent(tree, parent, pi,
                    src, ent, dst,
                    DST_SRC_NO_RELA, -1);
         nd_del_ent(tree, src, sn - 1);
     } else {
         validate_ent_suf_cache(tree, src, sn - 1);
-        ent = brt_nd_ent_n(tree, src, sn - 1);
+        brt_nd_ent_n(tree, src, sn - 1);
         nd_add_ent(tree, dst, 0,
                    src, ent, NULL,
                    DST_SRC_NO_RELA, 0);
         nd_del_ent(tree, parent, pi);
 
         dup_intn_ent(tree, parent, &_ent, tree, dst, ent);
-        ent = &_ent;
         nd_add_ent(tree, parent, pi,
                    dst, ent, dst,
                    DST_SRC_NO_RELA, -1);
@@ -1392,7 +1405,7 @@ static brt_node_t *fuse(brt_tree_t *tree, brt_node_t **pparent, u8 idx) {
         flatfs_add_logentry(sb, trans,
                             tree->ptree, sizeof(brt_ptree_t), LE_DATA);
         tree->ptree->root = flatfs_address_to_offset(sb, l);
-        flatfs_flush_buffer(tree->ptree, sizeof(brt_ptree_t), 0);
+        eflatfs_flush_buffer(tree->ptree, sizeof(brt_ptree_t), 0);
         tree->root = l;
         tree->height--;
         write_unlock(parent->lock);
@@ -1492,6 +1505,8 @@ static int tree_walk_fastpath(brt_tree_t *tree, brt_key_t key,
         goto out;
     }
 
+    preempt_disable();
+
     ndcache_for_each_entry(tree->ndc, entry, {
         if (wlock) {
             write_lock(entry->node->lock);
@@ -1534,6 +1549,8 @@ static int tree_walk_fastpath(brt_tree_t *tree, brt_key_t key,
         }
     }
 
+    preempt_enable();
+
 out:
     return ret;
 }
@@ -1554,7 +1571,7 @@ static long __brt_add(brt_tree_t *tree,
 
     /* Try fast-path first. */
     if (!tree_walk_fastpath(tree, k, &node, &pos, &is_not_equal,
-                            1, 0, BRT_MAX_KEYN - 1)) {
+                            1, 0, BRT_MAX_NR_ENT - 1)) {
         goto do_add;
     }
 
@@ -1563,13 +1580,13 @@ static long __brt_add(brt_tree_t *tree,
 
     /* Increase the tree height if needed. */
     new_root = NULL;
-    write_lock(&tree->root_lock);
+    write_lock(&tree->crab_root_lock);
     node = tree->root;
     if (unlikely(!node)) {
         new_root = node = brt_nd_new(tree, BRT_LEAF);
     }
     write_lock(node->lock);
-    if (unlikely(brt_nd_nkeys(node) == BRT_MAX_KEYN)) {
+    if (unlikely(brt_nd_nkeys(node) == BRT_MAX_NR_ENT)) {
         /* To split the root node, we have to create a new root. */
         new_root = parent = brt_nd_new(tree, BRT_INTN);
         parent->children[0] = flatfs_address_to_offset(sb, node);
@@ -1582,7 +1599,7 @@ static long __brt_add(brt_tree_t *tree,
         flatfs_memcpy_atomic(&tree->ptree->root, &noff, sizeof(noff));
         flatfs_flush_buffer(&tree->ptree->root, sizeof(noff), 1);
     }
-    write_unlock(&tree->root_lock);
+    write_unlock(&tree->crab_root_lock);
 
     /*
      * Find which node we insert the key into, while splitting preemptively
@@ -1592,7 +1609,7 @@ static long __brt_add(brt_tree_t *tree,
         u8 nkeys = brt_nd_nkeys(node);
 
         /* overflow check */
-        if (nkeys == BRT_MAX_KEYN) {
+        if (nkeys == BRT_MAX_NR_ENT) {
             brt_node_t *sibling;
             size_t cut = nkeys / 2;
             FLATFS_ASSERT(parent);
@@ -1747,17 +1764,17 @@ int brt_del(brt_tree_t* tree, brt_key_t key) {
 
     /* Try fast-path first. */
     if (!tree_walk_fastpath(tree, key, &node, &pos, &is_not_equal,
-                            1, BRT_MIN_KEYN + 1, -1)) {
+                            1, BRT_MIN_NR_KEY + 1, -1)) {
         root_unlocked = 1;
         goto do_del;
     }
 
     root_unlocked = 0;
-    write_lock(&tree->root_lock);
+    write_lock(&tree->crab_root_lock);
     node = tree->root;
     if (unlikely(!node)) {
         ret = -ENOENT;
-        write_unlock(&tree->root_lock);
+        write_unlock(&tree->crab_root_lock);
         goto out;
     }
     write_lock(node->lock);
@@ -1769,7 +1786,7 @@ int brt_del(brt_tree_t* tree, brt_key_t key) {
         u8 nkeys = brt_nd_nkeys(node);
 
         /* underflow check */
-        if (nkeys == BRT_MIN_KEYN) {
+        if (nkeys == BRT_MIN_NR_KEY) {
             brt_node_t *sib = NULL;
 
             if (rsib) {
@@ -1785,7 +1802,7 @@ int brt_del(brt_tree_t* tree, brt_key_t key) {
                 sib = brt_nd_nkeys(rsib) > brt_nd_nkeys(lsib) ? rsib : lsib;
             }
 
-            if (brt_nd_nkeys(sib) != BRT_MIN_KEYN) {
+            if (brt_nd_nkeys(sib) != BRT_MIN_NR_KEY) {
                 ((sib == lsib) ? share_l : share_r)(tree, parent, pos);
             } else {
                 if (sib == lsib) {
@@ -1808,7 +1825,7 @@ int brt_del(brt_tree_t* tree, brt_key_t key) {
 
         if (!root_unlocked) {
             root_unlocked = 1;
-            write_unlock(&tree->root_lock);
+            write_unlock(&tree->crab_root_lock);
         }
 
         if (parent) {
@@ -1856,7 +1873,7 @@ do_del:
     }
 
     if (!root_unlocked) {
-        write_unlock(&tree->root_lock);
+        write_unlock(&tree->crab_root_lock);
     }
 
     /* leaf remove */
@@ -1932,7 +1949,7 @@ void brt_dup(brt_tree_t *dst, brt_tree_t *src) {
     /* copy in-DRAM tree */
     dst->sbi = src->sbi;
     dst->height = src->height;
-    rwlock_init(&dst->root_lock);
+    rwlock_init(&dst->crab_root_lock);
 
     fifo->node = src->root;
     fifo->parent = NULL;
@@ -2016,14 +2033,14 @@ static brt_node_t *lowerbound(brt_tree_t *tree, brt_key_t key,
         goto do_lowerbound;
     }
 
-    read_lock(&tree->root_lock);
+    read_lock(&tree->crab_root_lock);
     node = tree->root;
     if (!node) {
-        read_unlock(&tree->root_lock);
+        read_unlock(&tree->crab_root_lock);
         goto out;
     }
     read_lock(node->lock);
-    read_unlock(&tree->root_lock);
+    read_unlock(&tree->crab_root_lock);
 
     while (1) {
         brt_node_t *child;
@@ -2115,7 +2132,7 @@ int brt_get(brt_tree_t *tree, brt_qr_t *res, brt_key_t key) {
             }
 
             if (likely(path_pre.len + path_suf.len == 1 &&
-                       last.chars[0] == ASCII_REWALK)) {
+                       last.chars[0] == CTLCHR_PREFIX_INTERCEPTOR)) {
                 if (!fastr_is_empty(_key)) {
                     ret = -EAGAIN;
                 }
@@ -2222,7 +2239,7 @@ static int do_absorb(brt_tree_t *dst, brt_tree_t *src) {
     u8 i, j, pos, dkn, skn, tkn, lkn, rkn, div, valid_idx;
     brt_node_t *src_min, *src_max, *dst_min, *dst_max;
     brt_node_t *dn, *sn, *ln, *rn, *parent, *child;
-    u8 *pslot, tmp_slots[BRT_MAX_KEYN];
+    u8 *pslot, tmp_slots[BRT_MAX_NR_ENT];
     DEFINE_TRANS_ON_STACK(trans);
     unsigned long victims;
     brt_tree_t *lt, *rt;
@@ -2271,7 +2288,7 @@ static int do_absorb(brt_tree_t *dst, brt_tree_t *src) {
     hdiff = dst->height - src->height;
 
     /* Increase the tree height if needed. */
-    if (unlikely(brt_nd_nkeys(dn) == BRT_MAX_KEYN)) {
+    if (unlikely(brt_nd_nkeys(dn) == BRT_MAX_NR_ENT)) {
         __le64 noff;
         /* To split the root node, we have to create a new root. */
         parent = brt_nd_new(dst, BRT_INTN);
@@ -2289,7 +2306,7 @@ static int do_absorb(brt_tree_t *dst, brt_tree_t *src) {
         u8 nkeys = brt_nd_nkeys(dn);
         FLATFS_ASSERT(brt_nd_type(dn) == BRT_INTN);
         /* overflow check */
-        if (nkeys == BRT_MAX_KEYN) {
+        if (nkeys == BRT_MAX_NR_ENT) {
             FLATFS_ASSERT(parent);
             rightmost = split(dst, parent, pos, nkeys / 2);
         }
@@ -2339,7 +2356,7 @@ static int do_absorb(brt_tree_t *dst, brt_tree_t *src) {
 
     /* Too much keys leads to split, which may change @parent. */
     par_add_ent = 0;
-    if (tkn > BRT_MAX_KEYN) {
+    if (tkn > BRT_MAX_NR_ENT) {
         par_add_ent = 1;
         /* Increase the tree height if needed. */
         if (unlikely(!parent)) {
@@ -2497,7 +2514,7 @@ static int do_absorb(brt_tree_t *dst, brt_tree_t *src) {
 
     /* Distribute */
     div = tkn;
-    if (div > BRT_MAX_KEYN) {
+    if (div > BRT_MAX_NR_ENT) {
         div /= 2;
     }
 
@@ -2927,15 +2944,15 @@ static void node_chgpre(brt_tree_t *tree, brt_node_t *node,
 
     /* Make room for recovery. */
     new_pre_buf = flatfs_address_to_offset(sb, dst_path_pre_buf);
-    ret = cmpxchg_double(&node->prestorer, &node->pre_buffer,
-                         node->prestorer, node->pre_buffer,
-                         node->pre_buffer, new_pre_buf);
+    ret = cmpxchg_double(&node->prestorer, &node->pre_buf,
+                         node->prestorer, node->pre_buf,
+                         node->pre_buf, new_pre_buf);
     BUG_ON(!ret);
     flatfs_flush_buffer(&node->cls[0], CACHELINE_SIZE, 1);
 
     /* TODO: Crash consistency of it */
-    node->path_delta_len += dst_path_pre.len - node->path_pre_len;
-    node->path_pre_len = cpu_to_le16(dst_path_pre.len);
+    node->delta_len += dst_path_pre.len - node->pre_len;
+    node->pre_len = cpu_to_le16(dst_path_pre.len);
     node->perm_pre_len = cpu_to_le16(dst_perm_pre.len);
     brt_nd_all_dirty(tree, node);
     flatfs_flush_buffer(&node->cls[1], CACHELINE_SIZE, 0);
@@ -3100,7 +3117,7 @@ void brt_dump(brt_tree_t *tree) {
                (unsigned long) fifo->node, fifo->dep);
 
         dump_node(tree, fifo->node);
-        printk("common prefix len: %hu\n", fifo->node->path_pre_len);
+        printk("common prefix len: %hu\n", fifo->node->pre_len);
 
         if (brt_nd_type(fifo->node) == BRT_INTN) {
             for (i = 0; i <= brt_nd_nkeys(fifo->node); i++) {
@@ -3118,8 +3135,35 @@ void brt_dump(brt_tree_t *tree) {
     }
 }
 
+static size_t calc_avg_suf_len(brt_tree_t *tree) {
+    struct super_block *sb = tree->sbi->super;
+
+    brt_node_t *node = tree->root;
+    size_t sum = 0, nr = 0;
+    __le64 off;
+
+    while (brt_nd_type(node) == BRT_INTN) {
+        node = flatfs_offset_to_address(sb, node->children[0]);
+    }
+
+    do {
+        int num_keys = brt_nd_nkeys(node), i;
+
+        for (i = 0; i < num_keys; i++) {
+            sum += brt_nd_path_suf_n(tree, node, i).len;
+            nr++;
+        }
+
+        off = node->next;
+        node = flatfs_offset_to_address(sb, off);
+    } while (off != BRT_NOFF);
+
+    return sum / nr;
+}
+
 void brt_stat(brt_tree_t *tree, brt_stat_t *stat) {
     stat->height = tree->height;
+    stat->avg_suf_len = calc_avg_suf_len(tree);
 }
 
 static void it_fetch_prefix(brt_it_t *it) {
@@ -3156,11 +3200,11 @@ static void it_carry(brt_it_t *it) {
     }
 }
 
-void brt_lobnd(brt_tree_t *tree, brt_it_t *it, brt_key_t lobnd) {
+void brt_scan(brt_tree_t *tree, brt_it_t *it, brt_key_t start, brt_key_t end) {
     int is_not_equal;
     it->tree = tree;
     it->start_pos = 0;
-    it->start = lowerbound(tree, lobnd, &it->start_pos, &is_not_equal);
+    it->start = lowerbound(tree, start, &it->start_pos, &is_not_equal);
     it->pathname = fastr(kmalloc(PATH_MAX, GFP_ATOMIC), 0);
     it->cur = it->start;
     it->cur_pos = it->start_pos;
@@ -3204,8 +3248,8 @@ static void node_recover(brt_node_t *node) {
     int ret;
     if (node->prestorer != BRT_NOFF) {
         /* The node has been updated. Undo it. */
-        ret = cmpxchg_double(&node->prestorer, &node->pre_buffer,
-                             node->prestorer, node->pre_buffer,
+        ret = cmpxchg_double(&node->prestorer, &node->pre_buf,
+                             node->prestorer, node->pre_buf,
                              BRT_NOFF, node->prestorer);
         BUG_ON(!ret);
         flatfs_flush_buffer(&node->cls[0], CACHELINE_SIZE, 1);

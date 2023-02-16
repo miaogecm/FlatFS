@@ -28,7 +28,7 @@
 #include <linux/pathman.h>
 
 #include "flatfs.h"
-#include "brtree.h"
+#include "brtree/tree.h"
 
 struct linux_dirent {
 	unsigned long	d_ino;
@@ -52,55 +52,32 @@ struct getdents_callback {
 #define DT2IF(dt) (((dt) << 12) & S_IFMT)
 #define IF2DT(sif) (((sif) & S_IFMT) >> 12)
 
-static inline char* entry_path(fastr_t pathname, char *buf, brt_qr_t *qr, size_t *len) {
-    fastr_t dst = fastr(buf, 0);
-    fastr_append(&dst, fastr_slice_after(qr->path, pathname.len));
-    *len = dst.len;
-    fastr_append_ch(&dst, '\0');
-    return buf;
-}
-
-static inline char* child_entry_path(char *buf, brt_qr_t *qr, size_t *len) {
-    size_t pos = fastr_find_last(qr->path, '/');
-    fastr_t dst = fastr(buf, 0);
-    fastr_append(&dst, fastr_slice_after(qr->path, pos + 1));
-    *len = dst.len;
-    fastr_append_ch(&dst, '\0');
-    return buf;
-}
-
-static inline int is_shadow_entry_first(brt_qr_t *qr) {
-    return !fastr_is_empty(qr->path) && qr->path.chars[qr->path.len - 1] == ASCII_FIRST;
-}
-
-static inline int is_shadow_entry_last(brt_qr_t *qr) {
-    return !fastr_is_empty(qr->path) && qr->path.chars[qr->path.len - 1] == ASCII_LAST;
-}
-
 static inline int is_rewalk_entry(brt_qr_t *qr) {
-    return !fastr_is_empty(qr->path) && qr->path.chars[qr->path.len - 1] == ASCII_REWALK;
+    return !fastr_is_empty(qr->path) && qr->path.chars[qr->path.len - 1] == CTLCHR_PREFIX_INTERCEPTOR;
 }
 
-static inline fastr_t copy_path(brt_qr_t *qr) {
-    char *buffer = kmalloc(qr->path.len, GFP_ATOMIC);
+static inline fastr_t generate_skip_path(fastr_t dir, brt_qr_t *qr) {
+    char *buffer = kmalloc(dir.len + qr->path.len + 3, GFP_ATOMIC);
     fastr_t fs = fastr(buffer, 0);
+    fastr_append(&fs, dir);
+    fastr_append_ch(&fs, CTLCHR_COMPONENT_SEPARATOR);
+    fastr_append(&fs, qr->path);
+    fastr_append_ch(&fs, CTLCHR_COMPONENT_SEPARATOR);
+    fastr_append_ch(&fs, '\x7f');
+    return fs;
+}
+
+static inline fastr_t copy_path(fastr_t dir, brt_qr_t *qr) {
+    char *buffer = kmalloc(dir.len + qr->path.len + 1, GFP_ATOMIC);
+    fastr_t fs = fastr(buffer, 0);
+    fastr_append(&fs, dir);
+    fastr_append_ch(&fs, CTLCHR_COMPONENT_SEPARATOR);
     fastr_append(&fs, qr->path);
     return fs;
 }
 
-static inline int reach_end(brt_qr_t *qr, fastr_t max) {
-    return is_shadow_entry_last(qr) && !fastr_strcmp(qr->path, max);
-}
-
-/* @qr must be a left shadow ent. */
-static inline fastr_t generate_skip_path(brt_qr_t *qr) {
-    fastr_t fs = copy_path(qr);
-    fs.chars[fs.len - 1] = ASCII_LAST;
-    return fs;
-}
-
-static void update_ctx_pos_key(struct dir_context *ctx, brt_qr_t *qr) {
-    ctx->pos_key = copy_path(qr);
+static void update_ctx_pos_key(struct dir_context *ctx, fastr_t dir, brt_qr_t *qr) {
+    ctx->pos_key = copy_path(dir, qr);
 }
 
 static int flatfs_readdir(struct file *file, struct dir_context *ctx)
@@ -109,37 +86,34 @@ static int flatfs_readdir(struct file *file, struct dir_context *ctx)
     struct fentry *fe = (struct fentry *) file->f_path.dentry;
 	struct super_block *sb = inode->i_sb;
 	struct flatfs_inode *pi;
-	fastr_t pathname;
-	brt_key_t min, max;
-	char child_buf[1024], *child_str;
 	timing_t readdir_time;
     brt_tree_t *tree = tree_under(fe);
-    brt_it_t it;
     DEFINE_BRT_QR(qr, BRT_QR_RAW);
-	size_t child_len;
+    int ret, count = 0;
+	brt_key_t min, max;
+	fastr_t pathname;
+    uint16_t mode;
+    brt_it_t it;
 	ino_t ino;
-	unsigned int count = 0;
-    int ret;
 
     BUG_ON(!d_in_flat_ns(file->f_path.dentry));
 
 	pathname = fe->d_fullpath;
-	if (pathname.len == 2 && pathname.chars[0] == '/' && pathname.chars[1] == '.') {
-		pathname = FASTR_NULL;
-	}
 
     FLATFS_INFO(FS_READDIR, "%.*s pos:%lld %.*s", FASTR_FMT(pathname), ctx->pos, FASTR_FMT(ctx->pos_key));
 
-	min = FASTR_IS_NOT_NULL(ctx->pos_key) ? ctx->pos_key : dir_min_key(pathname);
-	max = dir_max_key(pathname);
+	min = FASTR_IS_NOT_NULL(ctx->pos_key) ? ctx->pos_key : dir_path_lowerbound(pathname);
+	max = dir_path_upperbound(pathname);
 
 	FLATFS_START_TIMING(readdir_t, readdir_time);
 
-    brt_lobnd(tree, &it, min);
+    brt_scan(tree, &it, min, max);
 
-    ret = brt_it_next(&it, &qr);
+    FLATFS_INFO(FS_READDIR, "scan: [%.*s] to [%.*s]", FASTR_FMT(min), FASTR_FMT(max));
 
-    if (reach_end(&qr, max)) {
+    ret = brt_it_next(&it, &qr, CTLCHR_COMPONENT_SEPARATOR);
+
+    if (ret == -ENOENT) {
 		/* we reach the end in the last read directory operation, we should return 0 here */
 		struct getdents_callback *buf = container_of(ctx, struct getdents_callback, ctx);
 		buf->previous = NULL;
@@ -147,35 +121,16 @@ static int flatfs_readdir(struct file *file, struct dir_context *ctx)
 		goto out2;
     }
 
-	if (!FASTR_IS_NOT_NULL(ctx->pos_key) && is_shadow_entry_first(&qr)) {
-        ret = brt_it_next(&it, &qr);
-        BUG_ON(ret);
-    }
-
-again:
 	while (1) {
-		if (unlikely(ret == -ENOENT || reach_end(&qr, max))) {
+		if (unlikely(ret == -ENOENT)) {
 			break;
 		}
 
 		ino = qr.inode;
+        pi = flatfs_get_inode(sb, ino << FLATFS_INODE_BITS);
+        mode = le16_to_cpu(pi->i_mode);
 
 		switch (ino) {
-		case SHADOW_DENTRY_INO:// shadow entry
-			if (is_shadow_entry_first(&qr)) {
-                kfree(min.chars);
-				min = generate_skip_path(&qr);
-
-				FLATFS_INFO(FS_READDIR, "skip directory %.*s %.*s", FASTR_FMT(qr.path), FASTR_FMT(min));
-
-				/* adjust range */
-                brt_it_close(&it);
-                brt_lobnd(tree, &it, min);
-                ret = brt_it_next(&it, &qr);
-				goto again;
-			}
-			break;
-			
 		case 0: // read FlatFS root directory and current entry is dotdot	
 			if (!dir_emit(ctx, "..", 3, ino, IF2DT(le16_to_cpu(S_IRWXUGO)))) {
 				goto out;
@@ -189,27 +144,37 @@ again:
             if (is_rewalk_entry(&qr)) {
     			break;
 			}
-		
-			child_str = child_entry_path(child_buf, &qr, &child_len);
-			pi = flatfs_get_inode(sb, ino << FLATFS_INODE_BITS);
 
 			/* emit an entry */
-			if (!dir_emit(ctx, child_str, child_len,
-                          ino, IF2DT(le16_to_cpu(pi->i_mode)))) {
+			if (!dir_emit(ctx, qr.path.chars, (int) qr.path.len, ino, IF2DT(mode))) {
 				goto out;
 			}
 
-			FLATFS_INFO(FS_READDIR, "emit an entry[%u] ino. %lu %s", ++count, ino, child_str);
+			FLATFS_INFO(FS_READDIR, "emit an entry[%u] ino. %lu %.*s", ++count, ino, FASTR_FMT(qr.path));
 
 			break;
 		}
 
-        ret = brt_it_next(&it, &qr);
+        if (S_ISDIR(mode)) {
+            kfree(min.chars);
+            min = generate_skip_path(pathname, &qr);
+
+            FLATFS_INFO(FS_READDIR, "skip directory %.*s %.*s", FASTR_FMT(qr.path), FASTR_FMT(min));
+
+            /* skip subdirectory */
+            brt_it_close(&it);
+            brt_scan(tree, &it, min, max);
+        }
+
+        ret = brt_it_next(&it, &qr, CTLCHR_COMPONENT_SEPARATOR);
 	}
 
 out:
 	/* update ctx->pos_key, points to the next key */
-	update_ctx_pos_key(ctx, &qr);
+    if (ret == -ENOENT) {
+        qr.path = FASTR_LITERAL("\x7f");
+    }
+	update_ctx_pos_key(ctx, pathname, &qr);
 
 out2:
     brt_it_close(&it);
@@ -219,8 +184,9 @@ out2:
 	if (min.chars != ctx->pos_key.chars) {
         kfree(min.chars);
     }
-	kfree(max.chars);
-	
+    if (max.chars != qr.path.chars) {
+        kfree(max.chars);
+    }
 	return 0;
 }
 
@@ -230,41 +196,34 @@ static int flatfs_readdir_recur(struct file *file, struct dir_context *ctx)
     struct fentry *fe = (struct fentry *) file->f_path.dentry;
 	struct super_block *sb = inode->i_sb;
 	struct flatfs_inode *pi;
-	fastr_t pathname;
-	brt_key_t min, max;
-	char child_buf[1024], *child_str;
 	timing_t readdir_time;
     brt_tree_t *tree = tree_under(fe);
-    brt_it_t it;
     DEFINE_BRT_QR(qr, BRT_QR_RAW);
-	size_t child_len;
+    int ret, count = 0;
+	brt_key_t min, max;
+	fastr_t pathname;
+    uint16_t mode;
+    brt_it_t it;
 	ino_t ino;
-#ifdef CONFIG_FLATFS_DEBUG
-	unsigned int count = 0;
-#endif
-    int ret;
 
     BUG_ON(!d_in_flat_ns(file->f_path.dentry));
 
 	pathname = fe->d_fullpath;
-	if (pathname.len == 2 && pathname.chars[0] == '/' && pathname.chars[1] == '.') {
-		pathname = FASTR_NULL;
-	}
 
-#ifdef CONFIG_FLATFS_DEBUG
-	printk("flatfs_readdir: %.*s pos:%lld %.*s\n", FASTR_FMT(pathname), ctx->pos, FASTR_FMT(ctx->pos_key));
-#endif
+    FLATFS_INFO(FS_READDIR, "%.*s pos:%lld %.*s", FASTR_FMT(pathname), ctx->pos, FASTR_FMT(ctx->pos_key));
 
-	min = FASTR_IS_NOT_NULL(ctx->pos_key) ? ctx->pos_key : dir_min_key(pathname);
-	max = dir_max_key(pathname);
+	min = FASTR_IS_NOT_NULL(ctx->pos_key) ? ctx->pos_key : dir_path_lowerbound(pathname);
+	max = dir_path_upperbound(pathname);
 
 	FLATFS_START_TIMING(readdir_t, readdir_time);
 
-    brt_lobnd(tree, &it, min);
+    brt_scan(tree, &it, min, max);
 
-    ret = brt_it_next(&it, &qr);
+    FLATFS_INFO(FS_READDIR, "scan: [%.*s] to [%.*s]", FASTR_FMT(min), FASTR_FMT(max));
 
-    if (reach_end(&qr, max)) {
+    ret = brt_it_next(&it, &qr, CTLCHR_COMPONENT_SEPARATOR);
+
+    if (ret == -ENOENT) {
 		/* we reach the end in the last read directory operation, we should return 0 here */
 		struct getdents_callback *buf = container_of(ctx, struct getdents_callback, ctx);
 		buf->previous = NULL;
@@ -272,29 +231,23 @@ static int flatfs_readdir_recur(struct file *file, struct dir_context *ctx)
 		goto out2;
     }
 
-	if (!FASTR_IS_NOT_NULL(ctx->pos_key) && is_shadow_entry_first(&qr)) {
-        ret = brt_it_next(&it, &qr);
-        BUG_ON(ret);
-    }
-
 	while (1) {
-		if (unlikely(ret == -ENOENT || reach_end(&qr, max))) {
+		if (unlikely(ret == -ENOENT)) {
 			break;
 		}
 
 		ino = qr.inode;
+        pi = flatfs_get_inode(sb, ino << FLATFS_INODE_BITS);
+        mode = le16_to_cpu(pi->i_mode);
 
 		switch (ino) {
-		case SHADOW_DENTRY_INO:// shadow entry
-			break;
-
 		case 0: // read FlatFS root directory and current entry is dotdot
 			if (!dir_emit(ctx, "..", 3, ino, IF2DT(le16_to_cpu(S_IRWXUGO)))) {
 				goto out;
 			}
-#ifdef CONFIG_FLATFS_DEBUG
-			printk("emit an entry[%u] ino. %lu %s\n", ++count, ino, "..");
-#endif
+
+			FLATFS_INFO(FS_READDIR, "emit an entry[%u] ino. %lu %s", ++count, ino, "..");
+
 			break;
 
 		default: // normal entries
@@ -302,27 +255,25 @@ static int flatfs_readdir_recur(struct file *file, struct dir_context *ctx)
     			break;
 			}
 
-			child_str = entry_path(pathname, child_buf, &qr, &child_len);
-			pi = flatfs_get_inode(sb, ino << FLATFS_INODE_BITS);
-
 			/* emit an entry */
-			if (!dir_emit(ctx, child_str, child_len,
-                          ino, IF2DT(le16_to_cpu(pi->i_mode)))) {
+			if (!dir_emit(ctx, qr.path.chars, (int) qr.path.len, ino, IF2DT(mode))) {
 				goto out;
 			}
 
-#ifdef CONFIG_FLATFS_DEBUG
-			printk("emit an entry[%u] ino. %lu %s\n", ++count, ino, child_str);
-#endif
+			FLATFS_INFO(FS_READDIR, "emit an entry[%u] ino. %lu %.*s", ++count, ino, FASTR_FMT(qr.path));
+
 			break;
 		}
 
-        ret = brt_it_next(&it, &qr);
+        ret = brt_it_next(&it, &qr, CTLCHR_COMPONENT_SEPARATOR);
 	}
 
 out:
 	/* update ctx->pos_key, points to the next key */
-	update_ctx_pos_key(ctx, &qr);
+    if (ret == -ENOENT) {
+        qr.path = FASTR_LITERAL("\x7f");
+    }
+	update_ctx_pos_key(ctx, pathname, &qr);
 
 out2:
     brt_it_close(&it);
@@ -332,8 +283,9 @@ out2:
 	if (min.chars != ctx->pos_key.chars) {
         kfree(min.chars);
     }
-	kfree(max.chars);
-
+    if (max.chars != qr.path.chars) {
+        kfree(max.chars);
+    }
 	return 0;
 }
 

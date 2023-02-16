@@ -12,7 +12,7 @@
 #ifndef BPLUSTREE_RANGE_NDCACHE_H
 #define BPLUSTREE_RANGE_NDCACHE_H
 
-#include "flatfs.h"
+#include "../flatfs.h"
 
 #define NDCACHE_SIZE   3
 
@@ -22,6 +22,7 @@ struct ndcache {
 
         struct ndcache_entry {
             brt_node_t *node;
+            brt_vnode_t *vnode;
             struct list_head list;
         } nodes[NDCACHE_SIZE];
     } u[FLATFS_NCPU];

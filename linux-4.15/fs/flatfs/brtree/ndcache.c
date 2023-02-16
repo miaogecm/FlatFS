@@ -9,9 +9,9 @@
  * Node LRU Cache
  */
 
-#include "flatfs.h"
-#include "brtree.h"
+#include "../flatfs.h"
 #include "ndcache.h"
+#include "node.h"
 
 #ifdef CONFIG_NDCACHE_STATISTICS
 struct ndcache_stat ndcache_stat;
@@ -27,6 +27,7 @@ void ndcache_init(brt_tree_t *tree) {
         for (i = 0; i < NDCACHE_SIZE; i++) {
             entry = &cache->nodes[i];
             entry->node = NULL;
+            entry->vnode = NULL;
             INIT_LIST_HEAD(&entry->list);
             list_add_tail(&entry->list, &cache->lru_list);
         }
@@ -43,10 +44,11 @@ void ndcache_insert(brt_tree_t *tree, brt_node_t *node) {
     struct ndcache_per_cpu *cache = &tree->ndc->u[smp_processor_id()];
     entry = list_last_entry(&cache->lru_list, struct ndcache_entry, list);
     if (entry->node) {
-        brt_nd_put(tree, entry->node);
+        brt_dnode_put(tree, entry->node);
     }
-    brt_nd_hold(tree, node);
+    brt_dnode_hold(tree, node);
     entry->node = node;
+    entry->vnode = brt_vnode_get(node);
     list_move(&entry->list, &cache->lru_list);
 #ifdef CONFIG_NDCACHE_STATISTICS
     atomic_inc(&ndcache_stat.miss);
@@ -72,8 +74,9 @@ void ndcache_flush(brt_tree_t *tree) {
         for (i = 0; i < NDCACHE_SIZE; i++) {
             entry = &cache->nodes[i];
             if (entry->node) {
-                brt_nd_put(tree, entry->node);
+                brt_dnode_put(tree, entry->node);
                 entry->node = NULL;
+                entry->vnode = NULL;
             }
         }
     }

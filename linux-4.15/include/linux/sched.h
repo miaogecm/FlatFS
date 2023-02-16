@@ -768,6 +768,8 @@ struct task_struct {
 
     struct cursor           *cursors;
 
+    struct sok_pool_pool    *sok_pool_pool;
+
 #ifdef CONFIG_SYSVIPC
 	struct sysv_sem			sysvsem;
 	struct sysv_shm			sysvshm;

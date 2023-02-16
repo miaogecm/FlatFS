@@ -16,6 +16,8 @@
 #include <linux/string.h>
 #include <linux/bug.h>
 
+#include <asm/word-at-a-time.h>
+
 typedef struct {
     union {
         unsigned char *chars;
@@ -63,23 +65,15 @@ static inline fastr_t fastr_slice_before(fastr_t fs, size_t len) {
 }
 
 static inline unsigned long fastr_first_zpword(fastr_t fs) {
-    /* Manual loop unrolling - use a jump table here */
-    switch (fs.len) {
-        case 0: return 0;
-        case 1: return fs.chars[0];
-        case 2: return *(u16 *) &fs.chars[0];
-        case 3: return (fs.chars[2] << 16u) +
-                       *(u16 *) &fs.chars[0];
-        case 4: return *(u32 *) &fs.chars[0];
-        case 5: return ((u64) fs.chars[4] << 32u) +
-                       *(u32 *) &fs.chars[0];
-        case 6: return ((u64) (*(u16 *) &fs.chars[4]) << 32u) +
-                       *(u32 *) &fs.chars[0];
-        case 7: return ((u64) fs.chars[6] << 48u) +
-                       ((u64) (*(u16 *) &fs.chars[4]) << 32u) +
-                       *(u32 *) &fs.chars[0];
+    unsigned long word;
+    if (!fs.len) {
+        return 0;
     }
-    return *(unsigned long *) &fs.chars[0];
+    word = load_unaligned_zeropad(fs.chars);
+    if (fs.len < sizeof(unsigned long)) {
+        word &= ((1ul << (fs.len * BITS_PER_BYTE)) - 1);
+    }
+    return word;
 }
 
 static inline fastr_t fastr_eliminate_word(fastr_t *fs1, fastr_t *fs2) {
@@ -217,6 +211,10 @@ static inline size_t fastr_find_last(fastr_t haystack, char needle) {
 static inline int fastr_is_prefix(fastr_t str, fastr_t pre) {
     fastr_eliminate(&str, &pre);
     return fastr_is_empty(pre);
+}
+
+static inline size_t fastr_prefix_len(fastr_t s1, fastr_t s2) {
+    return fastr_eliminate(&s1, &s2).len;
 }
 
 #endif //_LINUX_FASTR_H

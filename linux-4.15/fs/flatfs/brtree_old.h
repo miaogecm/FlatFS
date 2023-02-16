@@ -17,15 +17,15 @@
 #include <linux/pathman.h>
 
 #include "flatfs.h"
-#include "ndcache.h"
+#include "brtree/ndcache.h"
 #include "treeman.h"
 
 /* The order of B+ Tree */
 #define BRT_DEGREE          24
-#define BRT_MAX_CHLDN       (BRT_DEGREE * 2)
-#define BRT_MAX_KEYN        (BRT_DEGREE * 2 - 1)
-#define BRT_MIN_CHLDN       (BRT_DEGREE)
-#define BRT_MIN_KEYN        (BRT_DEGREE - 1)
+#define BRT_MAX_NR_CHLD       (BRT_DEGREE * 2)
+#define BRT_MAX_NR_ENT        (BRT_DEGREE * 2 - 1)
+#define BRT_MIN_NR_CHLD       (BRT_DEGREE)
+#define BRT_MIN_NR_KEY        (BRT_DEGREE - 1)
 
 /* No offset */
 #define BRT_NOFF            0
@@ -49,7 +49,7 @@
 #define BRT_INTN_PER_BLK    (BRT_NODE_BLK_SIZE / BRT_INTN_SIZE)
 
 /* Number of initially allocated blocks */
-#define BRT_N_NODE_BLOCK    8192  // 32 MB
+#define BRT_NR_NODE_BLOCK    8192  // 32 MB
 #define BRT_N_ENT_BLOCK     65536 // 256 MB
 
 /* Max prefetch size when prefetching from prefix to suffix */
@@ -143,11 +143,11 @@ struct brt_node_s {
     __le16 path_pre_len;
     __le16 path_delta_len;
     __le16 perm_pre_len;
-    __u8   slots[BRT_MAX_KEYN];
+    __u8   slots[BRT_MAX_NR_ENT];
     char   padding1[3];
 
     /* cacheline [2, 13] */
-    brt_ent_t entries[BRT_MAX_KEYN];
+    brt_ent_t entries[BRT_MAX_NR_ENT];
     char      padding3[16];
 
     /* cacheline [14, 19], only intn */
@@ -176,46 +176,7 @@ struct brt_it_s {
     brt_tree_t *tree;
     brt_node_t *start, *cur;
     fastr_t pathname;
-    u8 start_pos, cur_pos;
-};
-
-/* lookup/range query result (qr) */
-struct brt_qr_s {
-    /*
-     * BRT_QR_RAW:
-     * Find the first entry == key, full
-     * match.
-     *
-     * BRT_QR_SEM:
-     * Find with semantics. Match the longest
-     * semantic prefix of key, whose entry
-     * exists, and terminates with \x7f.
-     *
-     * BRT_QR_PERM:
-     * Query permission, store in @ppcs.
-     */
-    enum {
-        BRT_QR_RAW = 1,
-        BRT_QR_SEM = 2,
-        BRT_QR_PERM = 4
-    } mode;
-
-    /* the effective path of this lookup */
-    fastr_t path;
-
-    /* inode and PPCs of the target */
-    ino_t inode;
-    /* a pointer to the value, only available in scan */
-    __le64 *valp;
-    /*
-     * The @ppcs contains many PPCs. Note that the
-     * actual PPC array comes from either @embed_ppcs,
-     * for well-compressed PPCs, or a kmalloc.
-     */
-    ppcs_t ppcs;
-
-    /* @see the ppcs field */
-    ppc_t embed_ppcs[8];
+    u8 cur_pos;
 };
 
 /* node block holds B+ tree leaf & internal node */
@@ -251,6 +212,7 @@ struct brt_entblk_hdr_s {
 /* statistics of a BrTree */
 struct brt_stat_s {
     size_t height;
+    size_t avg_suf_len;
 };
 
 /***************************************/
@@ -369,15 +331,15 @@ static inline void *brt_nd_entbuf(brt_tree_t *tree, brt_node_t *node,
 
 static inline fastr_t brt_nd_path_pre(brt_tree_t *tree, brt_node_t *node) {
     struct super_block *sb = tree->sbi->super;
-    void *buffer = flatfs_offset_to_address(sb, node->pre_buffer);
-    return fastr(buffer, le16_to_cpu(node->path_pre_len));
+    void *buffer = flatfs_offset_to_address(sb, node->pre_buf);
+    return fastr(buffer, le16_to_cpu(node->pre_len));
 }
 
 static inline size_t brt_nd_path_suf_len(brt_tree_t *tree, brt_node_t *node,
                                          brt_ent_t *ent) {
     u16 path_len = le16_to_cpu(ent->path_len) +
-                   le16_to_cpu(node->path_delta_len);
-    return path_len - le16_to_cpu(node->path_pre_len);
+                   le16_to_cpu(node->delta_len);
+    return path_len - le16_to_cpu(node->pre_len);
 }
 
 static inline size_t brt_nd_path_suf_len_n(brt_tree_t *tree,
@@ -416,7 +378,7 @@ static inline fastr_t brt_nd_path_suf_cache_n(brt_tree_t *tree,
 
 static inline ppcs_t brt_nd_perm_pre(brt_tree_t *tree, brt_node_t *node) {
     struct super_block *sb = tree->sbi->super;
-    ppc_t *ppcarr = flatfs_offset_to_address(sb, node->pre_buffer) +
+    ppc_t *ppcarr = flatfs_offset_to_address(sb, node->pre_buf) +
                     BRT_NDPRE_INIT_SIZE;
     size_t nppc = PPCS_LEN2NPPC(le16_to_cpu(node->perm_pre_len));
     return ppcs_from_narr(ppcarr, nppc);
@@ -585,7 +547,7 @@ void brt_clear(brt_tree_t *tree);
  * to or greater than @lowerbound. You may use @brt_it_next or @brt_it_close
  * to manipulate the iterator.
  */
-void brt_lobnd(brt_tree_t *tree, brt_it_t *it, brt_key_t lobnd);
+void brt_scan(brt_tree_t *tree, brt_it_t *it, brt_key_t start, brt_key_t end);
 
 /*
  * Let @dst absorb @src. If succeeded, the @src becomes an empty tree.

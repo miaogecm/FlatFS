@@ -43,7 +43,7 @@
 #include <linux/list.h>
 #include <linux/dax.h>
 #include "flatfs.h"
-#include "brtree.h"
+#include "brtree/tree.h"
 
 int measure_timing = 0;
 int support_clwb = 0;
@@ -499,21 +499,7 @@ static struct flatfs_inode *flatfs_init(struct super_block *sb,
 }
 
 static int flatfs_init_root_directory(struct super_block *sb, struct inode* root_i) {
-	struct flatfs_sb_info *sbi = FLATFS_SB(sb);
-    void *tree = sbi->root_domain->tree;
-    ppc_t llpc = ino2pppc(root_i);
-
-	/* FIXME: no transactions */
-    flatfs_namespace_insert(tree, FASTR_LITERAL("/."), (root_i->i_ino >> FLATFS_INODE_BITS),
-                            PPCS_NULL, llpc);
-    flatfs_namespace_insert(tree, FASTR_LITERAL("/.."), 0,
-                            PPCS_NULL, llpc);
-    flatfs_namespace_insert(tree, FASTR_LITERAL("/" ASCII_FIRST_STR), -1,
-                            PPCS_NULL, llpc);
-    flatfs_namespace_insert(tree, FASTR_LITERAL("/" ASCII_LAST_STR), -1,
-                            PPCS_NULL, llpc);
-
-	return 0;
+    return 0;
 }
 
 static inline void set_default_opts(struct flatfs_sb_info *sbi)

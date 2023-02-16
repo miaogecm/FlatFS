@@ -23,11 +23,8 @@
 #include <linux/fastr.h>
 #include "ppcs.h"
 
-#define ASCII_FIRST				0x01
-#define ASCII_FIRST_STR         "\x01"
-#define ASCII_LAST				0x7F
-#define ASCII_LAST_STR          "\x7f"
-#define ASCII_REWALK			0x7E
+#define CTLCHR_COMPONENT_SEPARATOR      '\x01'
+#define CTLCHR_PREFIX_INTERCEPTOR       '\x7f'
 
 #define cacheline_size  		64
 
@@ -113,9 +110,7 @@ struct flatfs_sb_info {
 	int			mount_path_len; /* length of mount path, excluding \0 */
 	char*		mount_path;
 
-	/* tree memeory management related structures */
-	struct node_blk_list* node_blk_lists[FLATFS_NCPU];
-	struct entry_blk_list* entry_blk_lists[FLATFS_NCPU];
+    struct list_head leaf_list_head;
 };
 
 enum {

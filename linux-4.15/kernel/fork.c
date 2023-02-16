@@ -1763,6 +1763,7 @@ static __latent_entropy struct task_struct *copy_process(
 		goto bad_fork_cleanup_io;
     INIT_LIST_HEAD(&p->d_victim_list);
     p->cursors = NULL;
+    p->sok_pool_pool = NULL;
 
 	if (pid != &init_struct_pid) {
 		pid = alloc_pid(p->nsproxy->pid_ns_for_children);

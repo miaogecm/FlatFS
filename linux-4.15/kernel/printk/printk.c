@@ -576,6 +576,23 @@ static u32 truncate_msg(u16 *text_len, u16 *trunc_msg_len,
 	return msg_used_size(*text_len + *trunc_msg_len, 0, pad_len);
 }
 
+static void log_copy(char *dst, const char *text, u16 text_len) {
+    char c;
+
+    while (text_len--) {
+        c = *text++;
+        if (c == '\x01') {
+            c = '|';
+        } else if (c == '\x7e') {
+            c = '#';
+        } else if (c == '\x7f') {
+            c = '$';
+        }
+
+        *dst++ = c;
+    }
+}
+
 /* insert record into the buffer, discard old ones, update heads */
 static int log_store(int facility, int level,
 		     enum log_flags flags, u64 ts_nsec,
@@ -610,10 +627,10 @@ static int log_store(int facility, int level,
 
 	/* fill message */
 	msg = (struct printk_log *)(log_buf + log_next_idx);
-	memcpy(log_text(msg), text, text_len);
+	log_copy(log_text(msg), text, text_len);
 	msg->text_len = text_len;
 	if (trunc_msg_len) {
-		memcpy(log_text(msg) + text_len, trunc_msg, trunc_msg_len);
+		log_copy(log_text(msg) + text_len, trunc_msg, trunc_msg_len);
 		msg->text_len += trunc_msg_len;
 	}
 	memcpy(log_dict(msg), dict, dict_len);

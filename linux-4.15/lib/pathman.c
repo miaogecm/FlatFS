@@ -15,14 +15,13 @@
 
 /*
  * get_parent_path: /a/b/test --> /a/b
- *                  /test --> NULL
+ *                  /test, test --> NULL
  */
 fastr_t get_parent_path(fastr_t path) {
-    size_t pos = fastr_find_last(path, '/');
+    size_t pos = fastr_find_last(path, CTLCHR_COMPONENT_SEPARATOR);
     char *buffer;
     fastr_t res;
-    if (pos == -1 || pos == 0) {
-        /* /test or test */
+    if (pos == FASTR_NPOS || pos == 0) {
         return FASTR_NULL;
     }
     buffer = kmalloc(pos, GFP_ATOMIC);
@@ -31,37 +30,29 @@ fastr_t get_parent_path(fastr_t path) {
     return res;
 }
 
-fastr_t dir_min_key_outer(fastr_t path) {
+fastr_t dir_path_upperbound(fastr_t path) {
+    char *buffer = kmalloc(path.len + 2, GFP_ATOMIC);
+    fastr_t fs = fastr(buffer, 0);
+    fastr_append(&fs, path);
+    fastr_append_ch(&fs, CTLCHR_COMPONENT_SEPARATOR);
+    fastr_append_ch(&fs, '\x7f');
+    return fs;
+}
+
+fastr_t dir_path_lowerbound(fastr_t path) {
     char *buffer = kmalloc(path.len + 1, GFP_ATOMIC);
     fastr_t fs = fastr(buffer, 0);
     fastr_append(&fs, path);
-    fastr_append_ch(&fs, '/');
+    fastr_append_ch(&fs, CTLCHR_COMPONENT_SEPARATOR);
     return fs;
 }
 
-fastr_t dir_min_key(fastr_t path) {
-    char *buffer = kmalloc(path.len + 2, GFP_ATOMIC);
-    fastr_t fs = fastr(buffer, 0);
-    fastr_append(&fs, path);
-    fastr_append_ch(&fs, '/');
-    fastr_append_ch(&fs, ASCII_FIRST);
-    return fs;
-}
-
-fastr_t dir_max_key_outer(fastr_t path) {
-    char *buffer = kmalloc(path.len + 2, GFP_ATOMIC);
-    fastr_t fs = fastr(buffer, 0);
-    fastr_append(&fs, path);
-    fastr_append_ch(&fs, '/');
-    fastr_append_ch(&fs, (char) (ASCII_LAST + 1));
-    return fs;
-}
-
-fastr_t dir_max_key(fastr_t path) {
-    char *buffer = kmalloc(path.len + 2, GFP_ATOMIC);
-    fastr_t fs = fastr(buffer, 0);
-    fastr_append(&fs, path);
-    fastr_append_ch(&fs, '/');
-    fastr_append_ch(&fs, ASCII_LAST);
-    return fs;
+size_t get_path_depth(fastr_t path) {
+    size_t i, cnt = 0;
+    for (i = 0; i < path.len; i++) {
+        if (path.chars[i] == CTLCHR_COMPONENT_SEPARATOR) {
+            cnt++;
+        }
+    }
+    return cnt;
 }

@@ -34,8 +34,6 @@
 #include <linux/spinlock.h>
 #include <linux/rwlock.h>
 #include "flatfs.h"
-#include "brtree.h"
-#include "treeman.h"
 
 static int num_blk_type[FLATFS_BLOCK_TYPE_MAX] = {1, 512, 262144};
 
@@ -47,132 +45,6 @@ struct scan_bitmap {
 	unsigned long *bitmap_2M;
 	unsigned long *bitmap_1G;
 };
-
-/*
- * flatfs_build_node_block_list: re-build node block list during a mount
- */
-void flatfs_build_node_block_list(struct super_block *sb, struct scan_bitmap *bm) 
-{
-	struct node_blk_list* list;
-	struct flatfs_sb_info *sbi = FLATFS_SB(sb);
-	struct flatfs_super_block *flatfs_sb = flatfs_get_super(sb);
-	struct flatfs_block_item *item;
-	int total_cpu = sbi->num_cpus, cpu, i, index;
-	unsigned long blocknr;
-	brt_nodeblk_hdr_t * header;
-	brt_node_t *node;
-	int node_per_block;
-
-	for (cpu = 0; cpu < total_cpu; cpu ++) {
-		list = kmalloc(sizeof(struct node_blk_list), GFP_ATOMIC);
-			
-        spin_lock_init(&list->free_leaf_node_list_locks);
-        spin_lock_init(&list->free_internal_node_list_locks);
-        INIT_LIST_HEAD(&list->free_leaf_node_lists);
-        INIT_LIST_HEAD(&list->free_internal_node_lists);
-
-		sbi->node_blk_lists[cpu] = list;
-    }
-
-	item = flatfs_get_block(sb, flatfs_get_block_off(sb, flatfs_sb->s_node_blocknr, FLATFS_BLOCK_TYPE_4K));
-	while (item->i_blocknr) {
-		blocknr = item->i_blocknr;
-		if (bm) {
-			switch(item->i_type) {
-			case FLATFS_BLOCK_TYPE_1G:
-				set_bit(blocknr, bm->bitmap_1G);
-				break;
-			case FLATFS_BLOCK_TYPE_2M:
-				set_bit(blocknr, bm->bitmap_2M);
-				break;
-			default:
-				printk(KERN_WARNING "flatfs_build_node_block_list wrong type\n");
-				break;
-			}	
-		}
-		
-		/* scan this huge page */
-		for (i = 0; i < num_blk_type[item->i_type]; i ++, blocknr ++) {
-			header = brt_nodeblk_hdr_of(flatfs_get_block(sb, flatfs_get_block_off(sb, blocknr, FLATFS_BLOCK_TYPE_4K)));
-			INIT_LIST_HEAD(&header->list);
-			
-			cpu = header->cpu;
-			node_per_block = (header->type == BRT_LEAF) ? BRT_LEAF_PER_BLK : BRT_INTN_PER_BLK;
-				
-			if (hweight64(header->bitmap) < node_per_block)
-				list_add(&header->list, 
-					header->type ? &sbi->node_blk_lists[cpu]->free_internal_node_lists : &sbi->node_blk_lists[cpu]->free_leaf_node_lists);
-				
-			for_each_set_bit(index, (unsigned long*)&header->bitmap, node_per_block) {
-				node = brt_nd_addr(header, index, header->type);
-				node->lock = kmalloc(sizeof(rwlock_t), GFP_ATOMIC);
-				rwlock_init(node->lock);
-			}
-		}
-		item++;
-	}
-
-	printk("flatfs build node block lists\n");
-}
-
-/*
- * flatfs_build_entry_block_list: re-build entry block list during a mount
- */
-void flatfs_build_entry_block_list(struct super_block *sb, struct scan_bitmap *bm) 
-{
-	struct entry_blk_list* list;
-	struct flatfs_sb_info *sbi = FLATFS_SB(sb);
-	struct flatfs_super_block *flatfs_sb = flatfs_get_super(sb);
-	struct flatfs_block_item *item;
-	int total_cpu = sbi->num_cpus, cpu, i;
-	unsigned long blocknr;
-	brt_entblk_hdr_t *header;
-
-	for (cpu = 0; cpu < total_cpu; cpu ++) {
-		list = kmalloc(sizeof(struct entry_blk_list), GFP_ATOMIC);
-		
-        spin_lock_init(&list->free_entry_block_list_locks);
-        spin_lock_init(&list->inuse_entry_block_list_locks);
-        INIT_LIST_HEAD(&list->free_entry_block_lists);
-        INIT_LIST_HEAD(&list->inuse_entry_block_lists);
-
-		sbi->entry_blk_lists[cpu] = list;
-	}
-
-	item = flatfs_get_block(sb, flatfs_get_block_off(sb, flatfs_sb->s_entry_blocknr, FLATFS_BLOCK_TYPE_4K));	
-	while (item->i_blocknr) {
-		blocknr = item->i_blocknr;
-		if (bm) {
-			switch(item->i_type) {
-			case FLATFS_BLOCK_TYPE_1G:
-				set_bit(blocknr, bm->bitmap_1G);
-				break;
-			case FLATFS_BLOCK_TYPE_2M:
-				set_bit(blocknr, bm->bitmap_2M);
-				break;
-			default:
-				printk(KERN_WARNING "flatfs_build_entry_block_list wrong type\n");
-				break;
-			}	
-		}
-				
-		for (i = 0; i < num_blk_type[item->i_type]; i ++, blocknr ++) {
-			header = brt_entblk_hdr_of(sb, blocknr);
-			INIT_LIST_HEAD(&header->list);
-			header->lock = kmalloc(sizeof(spinlock_t), GFP_ATOMIC);
-			spin_lock_init(header->lock);
-			cpu = header->cpu;
-			if (header->num_entries) {
-				list_add(&header->list, &sbi->entry_blk_lists[cpu]->inuse_entry_block_lists);
-			} else {
-				list_add(&header->list, &sbi->entry_blk_lists[cpu]->free_entry_block_lists);
-			}
-		}
-		item++;
-	}
-
-	printk("flatfs build entry block lists\n");
-}
 
 static void flatfs_clear_datablock_inode(struct super_block *sb)
 {
@@ -248,10 +120,6 @@ static bool flatfs_can_skip_full_scan(struct super_block *sb)
 		sbi->itable[cpu].s_inodes_used_count = le32_to_cpu(super->s_inodes_used_count[cpu]);
 		sbi->itable[cpu].s_free_inode_hint = le32_to_cpu(super->s_free_inode_hint[cpu]);	
 	}
-
-	flatfs_build_node_block_list(sb, NULL);
-
-	flatfs_build_entry_block_list(sb, NULL);
 
 	flatfs_init_blockmap_from_inode(sb);
 
@@ -665,9 +533,6 @@ int flatfs_setup_blocknode_map(struct super_block *sb)
 		/* set the block 0 as this is used */
 		sbi->itable[cpu].s_free_inode_hint = FLATFS_FREE_INODE_HINT_START;
 	}
-
-	flatfs_build_node_block_list(sb, &bm);
-	flatfs_build_entry_block_list(sb, &bm);
 
 	/* initialize the num_free_blocks to */
 	sbi->num_free_blocks = ((unsigned long)(initsize) >> PAGE_SHIFT);

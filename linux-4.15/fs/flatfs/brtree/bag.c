@@ -10,9 +10,10 @@
  * later in user-space, to facilitate BrTree debugging and performance tunning.
  */
 
-#include "brtree.h"
-#include "brbag.h"
 #include <linux/fastr.h>
+#include "../flatfs.h"
+#include "tree.h"
+#include "bag.h"
 
 #define BRBAG_SIZE      (1024 * 1024 * 1024 * 1ul)
 #define BRBAG_DUMP_PATH "/etc/brbag"

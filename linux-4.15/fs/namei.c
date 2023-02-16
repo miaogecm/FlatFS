@@ -508,8 +508,7 @@ void path_put(const struct path *path)
 EXPORT_SYMBOL(path_put);
 
 struct cursor {
-    uint16_t seg : 6;
-    uint16_t pos : 10;
+    uint16_t pos, seg;
 };
 
 #define EMBEDDED_LEVELS 2
@@ -1930,8 +1929,8 @@ inside:
 }
 
 static void copy_till_next_slash_or_end(char **dst, char **src, const char *end) {
-	unsigned long a = 0, t;
-	unsigned long adata, mask, len, l;
+	unsigned long a = 0, b, t;
+	unsigned long adata, bdata, amask, bmask, len;
 	const struct word_at_a_time constants = WORD_AT_A_TIME_CONSTANTS;
 
 	len = 0;
@@ -1945,14 +1944,20 @@ inside:
         if (*src + len + sizeof(unsigned long) > end) {
             ((char *) &a)[end - (*src + len)] = '/';
         }
-        a ^= REPEAT_BYTE('/');
-	} while (!has_zero(a, &adata, &constants));
+        b = a ^ REPEAT_BYTE(CTLCHR_COMPONENT_SEPARATOR);
+        a = a ^ REPEAT_BYTE('/');
+        has_zero(a, &adata, &constants);
+        has_zero(b, &bdata, &constants);
+	} while (!adata && !bdata);
 
 	adata = prep_zero_mask(a, adata, &constants);
-	mask = create_zero_mask(adata);
+    amask = create_zero_mask(adata);
+
+    bdata = prep_zero_mask(b, bdata, &constants);
+    bmask = create_zero_mask(bdata);
 
     *(unsigned long *) (*dst + len) = t;
-	len += find_zero(mask);
+	len += min(find_zero(amask), find_zero(bmask));
 
     *dst += len;
     *src += len;
@@ -2060,6 +2065,8 @@ static struct domain *find_domain(struct fentry *dir, fastr_t full_path) {
     return dom;
 }
 
+#define IS_COMPONENT_SEPARATOR(ch)      ((ch) == '/' || (ch) == CTLCHR_COMPONENT_SEPARATOR)
+
 /*
  * Concatenate all the pathname segments, and normalize it (i.e. remove all redundant slashes, dot
  * and dotdot if we use Plan-9 scheme). The processed path will be stored in @norm_path.
@@ -2090,7 +2097,7 @@ static int pathname_normalize(fastr_t *norm_path, unsigned *depp, struct cursor 
             pos = p - segments[seg].chars;
 
             if (*p == '.') {
-                if (p + 1 < end && p[1] == '.' && (p + 2 >= end || p[2] == '/')) {
+                if (p + 1 < end && p[1] == '.' && (p + 2 >= end || IS_COMPONENT_SEPARATOR(p[2]))) {
                     /* dotdot */
                     if (used) {
                         /* rollback writer pointer - fast path */
@@ -2104,19 +2111,19 @@ static int pathname_normalize(fastr_t *norm_path, unsigned *depp, struct cursor 
                             goto out;
                         }
                         /* Rollback cache is not large enough. */
-                        while (*--writer != '/');
+                        while (*--writer != CTLCHR_COMPONENT_SEPARATOR);
                     }
                     dep--;
                     p += 2;
                     continue;
-                } else if (p + 1 >= end || p[1] == '/') {
+                } else if (p + 1 >= end || IS_COMPONENT_SEPARATOR(p[1])) {
                     /* dot */
                     p += 1;
                     continue;
                 }
             }
 
-            if (*p != '/') {
+            if (!IS_COMPONENT_SEPARATOR(*p)) {
                 rollback_cache[top++, top &= 3] = writer;
                 if (used < 4) {
                     used++;
@@ -2124,7 +2131,7 @@ static int pathname_normalize(fastr_t *norm_path, unsigned *depp, struct cursor 
 
                 cursors[dep++] = (struct cursor) { .seg = seg, .pos = pos };
 
-                *writer++ = '/';
+                *writer++ = CTLCHR_COMPONENT_SEPARATOR;
                 copy_till_next_slash_or_end((char **) &writer, (char **) &p, end);
             }
         }
@@ -2205,7 +2212,7 @@ static int pathname_analyze(struct fentry **fep, struct fentry **lastp, struct c
         } else {
             fe->d_refcnt = UINT_MAX;
         }
-        fastr_append_ch(&full_path, '/');
+        fastr_append_ch(&full_path, CTLCHR_COMPONENT_SEPARATOR);
         fastr_append(&full_path, trail);
 
         last = --p;

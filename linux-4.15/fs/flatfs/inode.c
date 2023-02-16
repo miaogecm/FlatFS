@@ -34,7 +34,6 @@
 
 #include "flatfs.h"
 #include "dax.h"
-#include "brtree.h"
 
 unsigned int blk_type_to_shift[FLATFS_BLOCK_TYPE_MAX] = {12, 21, 30};
 uint32_t blk_type_to_size[FLATFS_BLOCK_TYPE_MAX] = {0x1000, 0x200000, 0x40000000};
